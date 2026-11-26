@@ -1,0 +1,2727 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="Фино — учёт финансов со счетами, доходами, расходами и переводами" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <title>Фино — Учёт финансов</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: { 400: '#38bdf8', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1' },
+            surface: { 800: '#1e293b', 900: '#0f172a', 950: '#020617' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    html { --font-scale: 1; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      overscroll-behavior: none;
+      font-size: calc(16px * var(--font-scale, 1));
+    }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .slide-up { animation: slideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    input[type="number"] { -moz-appearance: textfield; }
+
+    /* ===== Theme variables ===== */
+    :root, .dark {
+      --bg: #020617;
+      --card: #0f172a;
+      --card-border: #1e293b;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --input-bg: #1e293b;
+      --header-bg: rgba(2, 6, 23, 0.72);
+    }
+    html:not(.dark) {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --card-border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      --input-bg: #f8fafc;
+      --header-bg: rgba(255, 255, 255, 0.72);
+    }
+    body { background: var(--bg); color: var(--text); }
+    .card-surface {
+      background: var(--card) !important;
+      border-color: var(--card-border) !important;
+    }
+    .text-main { color: var(--text) !important; }
+    .text-muted { color: var(--text-muted) !important; }
+    .input-surface {
+      background: var(--input-bg) !important;
+      border-color: var(--card-border) !important;
+      color: var(--text) !important;
+    }
+    .header-surface {
+      background: var(--header-bg) !important;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .modal-surface {
+      background: var(--card) !important;
+      border-color: var(--card-border) !important;
+    }
+    body.has-wallpaper .header-surface {
+      background: rgba(0,0,0,0.28) !important;
+    }
+    html:not(.dark) body.has-wallpaper .header-surface {
+      background: rgba(255,255,255,0.4) !important;
+    }
+    body.has-wallpaper .header-surface h1,
+    body.has-wallpaper .header-surface p {
+      color: #fff !important;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.45);
+    }
+    html:not(.dark) body.has-wallpaper .header-surface h1,
+    html:not(.dark) body.has-wallpaper .header-surface p {
+      color: #0f172a !important;
+      text-shadow: 0 1px 2px rgba(255,255,255,0.7);
+    }
+  
+    .progress-bar { height: 6px; border-radius: 99px; background: var(--card-border); overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 99px; transition: width 0.3s ease; }
+    .hidden { display: none !important; pointer-events: none !important; }
+    .fit-line {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+    #home-budgets-list > * { min-width: 0; }
+    #accounts-list > * { min-width: 0; }
+  </style>
+</head>
+<body class="min-h-screen dark">
+  <div id="app" class="max-w-lg mx-auto min-h-screen flex flex-col relative">
+
+    <!-- ==================== HOME SCREEN ==================== -->
+    <div id="screen-home" class="flex flex-col min-h-screen">
+      <header class="sticky top-0 z-30 header-surface backdrop-blur-md px-3 py-1.5">
+        <div class="flex items-center justify-between gap-2">
+          <h1 class="text-base font-bold tracking-tight leading-none">Фино</h1>
+          <button id="btn-settings" onclick="window.openSettings&&window.openSettings()" class="p-1.5 rounded-lg input-surface transition active:scale-95 relative z-50" aria-label="Настройки">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-main" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-y-auto no-scrollbar px-4 pb-28">
+        <!-- Month + Year Summary -->
+        <section class="grid grid-cols-2 gap-2 mt-2 min-w-0">
+          <button type="button" id="card-month" class="card-surface border rounded-2xl p-2 text-left w-full active:scale-[0.98] transition min-w-0 overflow-hidden">
+            <div class="flex items-center gap-1 mb-1.5 min-w-0">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-primary-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span class="text-xs font-medium text-muted fit-line">Этот месяц</span>
+            </div>
+            <div class="space-y-1">
+              <div class="input-surface rounded-lg px-2 py-1.5 min-w-0">
+                <p class="text-xs text-muted leading-none mb-0.5">Доходы</p>
+                <p id="month-income" class="text-sm font-semibold text-emerald-400 fit-line tabular-nums leading-tight">+0 ₽</p>
+              </div>
+              <div class="input-surface rounded-lg px-2 py-1.5 min-w-0">
+                <p class="text-xs text-muted leading-none mb-0.5">Расходы</p>
+                <p id="month-expense" class="text-sm font-semibold text-rose-400 fit-line tabular-nums leading-tight">−0 ₽</p>
+              </div>
+              <div class="input-surface rounded-lg px-2 py-1.5 min-w-0">
+                <p class="text-xs text-muted leading-none mb-0.5">Разница</p>
+                <p id="month-diff" class="text-sm font-bold text-emerald-400 fit-line tabular-nums leading-tight">+0 ₽</p>
+              </div>
+            </div>
+          </button>
+
+          <button type="button" id="card-year" class="card-surface border rounded-2xl p-2 text-left w-full active:scale-[0.98] transition min-w-0 overflow-hidden">
+            <div class="flex items-center gap-1 mb-1.5 min-w-0">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-primary-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span class="text-xs font-medium text-muted fit-line">Этот год</span>
+            </div>
+            <div class="space-y-1">
+              <div class="input-surface rounded-lg px-2 py-1.5 min-w-0">
+                <p class="text-xs text-muted leading-none mb-0.5">Доходы</p>
+                <p id="year-income" class="text-sm font-semibold text-emerald-400 fit-line tabular-nums leading-tight">+0 ₽</p>
+              </div>
+              <div class="input-surface rounded-lg px-2 py-1.5 min-w-0">
+                <p class="text-xs text-muted leading-none mb-0.5">Расходы</p>
+                <p id="year-expense" class="text-sm font-semibold text-rose-400 fit-line tabular-nums leading-tight">−0 ₽</p>
+              </div>
+              <div class="input-surface rounded-lg px-2 py-1.5 min-w-0">
+                <p class="text-xs text-muted leading-none mb-0.5">Разница</p>
+                <p id="year-diff" class="text-sm font-bold text-emerald-400 fit-line tabular-nums leading-tight">+0 ₽</p>
+              </div>
+            </div>
+          </button>
+        </section>
+
+        <!-- Accounts -->
+        
+        <!-- Budgets on home -->
+        <section class="mt-6" id="block-budgets">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold">Бюджеты</h2>
+            <button id="btn-all-budgets" class="text-xs text-primary-400 font-medium">Все →</button>
+          </div>
+          <div id="home-budgets-list" class="grid grid-cols-2 gap-2"></div>
+          <div id="home-budgets-empty" class="hidden text-center py-4 text-muted text-sm">Нет бюджетов для главной</div>
+        </section>
+
+<section class="mt-6" id="block-accounts">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold">Мои счета</h2>
+            <button id="btn-add-account" class="text-xs text-primary-400 font-medium flex items-center gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Добавить
+            </button>
+          </div>
+          <div id="accounts-list" class="space-y-2"></div>
+          <div id="accounts-empty" class="hidden text-center py-10">
+            <p class="text-muted text-sm">Нет счетов</p>
+            <p class="text-muted text-xs mt-1">Добавьте первый счёт</p>
+          </div>
+        </section>
+
+        <!-- Recent transactions -->
+        <section class="mt-7" id="block-operations">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold">Последние операции</h2>
+            <button id="btn-all-transactions" class="text-xs text-primary-400 font-medium">Все →</button>
+          </div>
+          <div id="recent-list" class="space-y-2"></div>
+          <div id="recent-empty" class="hidden text-center py-8 text-muted text-sm">Пока нет операций</div>
+        </section>
+      </main>
+    </div>
+
+    <!-- ==================== TRANSACTIONS SCREEN ==================== -->
+    <div id="screen-transactions" class="hidden flex flex-col min-h-screen">
+      <header class="sticky top-0 z-30 header-surface backdrop-blur-md px-4 pt-3 pb-3 border-b border-slate-800/60">
+        <div class="flex items-center gap-3">
+          <button id="btn-back-home" class="p-2 -ml-2 rounded-xl hover:input-surface transition">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 class="text-lg font-bold">Все операции</h1>
+        </div>
+      </header>
+      <main class="flex-1 overflow-y-auto no-scrollbar px-4 py-4 pb-28">
+        <div class="flex gap-2 mb-4 flex-wrap">
+          <button data-filter="all" class="tx-filter px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-600 text-white">Все</button>
+          <button data-filter="income" class="tx-filter px-3 py-1.5 rounded-lg text-xs font-medium input-surface text-main">Доходы</button>
+          <button data-filter="expense" class="tx-filter px-3 py-1.5 rounded-lg text-xs font-medium input-surface text-main">Расходы</button>
+          <button data-filter="transfer" class="tx-filter px-3 py-1.5 rounded-lg text-xs font-medium input-surface text-main">Переводы</button>
+        </div>
+        <div id="all-transactions-list" class="space-y-2"></div>
+      </main>
+    </div>
+
+    <!-- ==================== ACTION SHEET ==================== -->
+    <div id="sheet-account" class="fixed inset-0 z-[110] hidden">
+      <div class="absolute inset-0 bg-black/60 fade-in" data-close="sheet-account"></div>
+      <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t slide-up safe-bottom">
+        <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mt-3 mb-2"></div>
+        <div class="px-5 pt-2 pb-6">
+          <div class="text-center mb-5">
+            <p id="sheet-account-name" class="text-lg font-bold">Счёт</p>
+            <p id="sheet-account-balance" class="text-2xl font-bold mt-1 text-primary-400">0 ₽</p>
+          </div>
+          <div id="sheet-actions" class="space-y-2">
+            <button type="button" data-start-action="expense" class="w-full flex items-center gap-3 active:scale-[0.98] transition text-white font-semibold py-3 px-4 rounded-xl" style="background:#e11d48">
+              <span class="w-7 h-7 rounded-full flex items-center justify-center text-sm" style="background:rgba(255,255,255,0.2)">↓</span>
+              Расход
+            </button>
+            <button type="button" data-start-action="income" class="w-full flex items-center gap-3 active:scale-[0.98] transition text-white font-semibold py-3 px-4 rounded-xl" style="background:#059669">
+              <span class="w-7 h-7 rounded-full flex items-center justify-center text-sm" style="background:rgba(255,255,255,0.2)">↑</span>
+              Доход
+            </button>
+            <button type="button" data-start-action="transfer" class="w-full flex items-center gap-3 active:scale-[0.98] transition text-white font-semibold py-3 px-4 rounded-xl" style="background:#0284c7">
+              <span class="w-7 h-7 rounded-full flex items-center justify-center text-sm" style="background:rgba(255,255,255,0.2)">⇄</span>
+              Перевод
+            </button>
+          </div>
+          <button data-close="sheet-account" class="w-full py-3 text-muted font-medium rounded-xl hover:input-surface transition mt-2">
+            Отмена
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TRANSACTION MODAL ==================== -->
+    <div id="modal-transaction" class="fixed inset-0 z-[120] hidden">
+      <div class="absolute inset-0 bg-black/60 fade-in" data-close="modal-transaction"></div>
+      <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t max-h-[92vh] overflow-y-auto slide-up safe-bottom">
+        <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mt-3"></div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-5">
+            <h3 id="modal-tx-title" class="text-lg font-bold">Новая операция</h3>
+            <button data-close="modal-transaction" class="p-2 rounded-xl input-surface hover:bg-slate-700">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="mb-4">
+            <label class="block text-xs text-muted mb-1.5">Сумма</label>
+            <div class="relative">
+              <input id="input-amount" type="number" inputmode="decimal" placeholder="0" class="w-full input-surface border rounded-xl px-4 py-3.5 text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <span class="absolute right-4 top-1/2 -translate-y-1/2 text-muted font-medium">₽</span>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="block text-xs text-muted mb-1.5" id="label-account-from">Счёт</label>
+            <select id="select-account-from" class="w-full input-surface border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></select>
+          </div>
+
+          <div id="block-account-to" class="mb-4 hidden">
+            <label class="block text-xs text-muted mb-1.5">На счёт</label>
+            <select id="select-account-to" class="w-full input-surface border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></select>
+          </div>
+
+          <div id="block-category" class="mb-4">
+            <label class="block text-xs text-muted mb-1.5">Категория</label>
+            <div id="categories-grid" class="grid grid-cols-4 gap-2"></div>
+            <div id="block-subcategory" class="mt-3 hidden">
+              <label class="block text-xs text-muted mb-1.5">Подкатегория</label>
+              <div id="subcategories-row" class="flex flex-wrap gap-2"></div>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="block text-xs text-muted mb-1.5">Комментарий</label>
+            <input id="input-note" type="text" placeholder="Необязательно" class="w-full input-surface border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+
+          <div class="mb-6">
+            <label class="block text-xs text-muted mb-1.5">Дата</label>
+            <input id="input-date" type="date" class="w-full input-surface border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+
+          <button id="btn-save-tx" class="w-full bg-primary-600 hover:bg-primary-500 active:scale-[0.98] transition text-white font-semibold py-3.5 rounded-xl">
+            Сохранить
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== ADD ACCOUNT MODAL ==================== -->
+    <div id="modal-account" class="fixed inset-0 z-[120] hidden">
+      <div class="absolute inset-0 bg-black/60 fade-in" data-close="modal-account"></div>
+      <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t slide-up safe-bottom">
+        <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mt-3"></div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold">Новый счёт</h3>
+            <button data-close="modal-account" class="p-2 rounded-xl input-surface hover:bg-slate-700">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div class="mb-4">
+            <label class="block text-xs text-muted mb-1.5">Название</label>
+            <input id="input-account-name" type="text" placeholder="Например: Карта Тинькофф" class="w-full input-surface border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div class="mb-4">
+            <label class="block text-xs text-muted mb-1.5">Начальный баланс</label>
+            <input id="input-account-balance" type="number" inputmode="decimal" placeholder="0" class="w-full input-surface border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div class="mb-6">
+            <label class="block text-xs text-muted mb-1.5">Иконка</label>
+            <div id="account-icons" class="flex flex-wrap gap-2">
+              <button data-icon="💵" class="acc-icon w-11 h-11 rounded-xl input-surface border-2 border-primary-500 text-xl flex items-center justify-center">💵</button>
+              <button data-icon="💳" class="acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl flex items-center justify-center">💳</button>
+              <button data-icon="🏦" class="acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl flex items-center justify-center">🏦</button>
+              <button data-icon="💰" class="acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl flex items-center justify-center">💰</button>
+              <button data-icon="🎯" class="acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl flex items-center justify-center">🎯</button>
+              <button data-icon="📈" class="acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl flex items-center justify-center">📈</button>
+              <button data-icon="🏠" class="acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl flex items-center justify-center">🏠</button>
+              <button data-icon="✈️" class="acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl flex items-center justify-center">✈️</button>
+            </div>
+          </div>
+          <button id="btn-save-account" class="w-full bg-primary-600 hover:bg-primary-500 active:scale-[0.98] transition text-white font-semibold py-3.5 rounded-xl">
+            Создать счёт
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SETTINGS ==================== -->
+    <div id="modal-settings" class="fixed inset-0 z-[100] hidden">
+      <div class="absolute inset-0 bg-black/60 fade-in" data-close="modal-settings"></div>
+      <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t max-h-[90vh] overflow-y-auto slide-up safe-bottom">
+        <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mt-3"></div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold">Настройки</h3>
+            <button data-close="modal-settings" class="p-2 rounded-xl input-surface hover:bg-slate-700">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+
+          <!-- Appearance -->
+          <p class="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Оформление</p>
+          <div class="space-y-2 mb-5">
+            <div class="flex items-center justify-between input-surface rounded-xl px-4 py-3">
+              <span class="font-medium">Тема</span>
+              <div class="flex rounded-lg p-1 gap-1 input-surface">
+                <button id="theme-dark" class="theme-btn px-3 py-1.5 rounded-md text-xs font-medium bg-primary-600 text-white">Тёмная</button>
+                <button id="theme-light" class="theme-btn px-3 py-1.5 rounded-md text-xs font-medium text-muted">Светлая</button>
+              </div>
+            </div>
+            <div class="flex items-center justify-between input-surface rounded-xl px-4 py-3">
+              <span class="font-medium">Размер текста</span>
+              <div class="flex rounded-lg p-0.5 gap-0.5 input-surface">
+                <button id="font-sm" class="font-size-btn px-2.5 py-1.5 rounded-md text-[10px] font-medium text-muted">A</button>
+                <button id="font-md" class="font-size-btn px-2.5 py-1.5 rounded-md text-xs font-medium bg-primary-600 text-white">A</button>
+                <button id="font-lg" class="font-size-btn px-2.5 py-1.5 rounded-md text-xs font-medium text-muted">A</button>
+                <button id="font-xl" class="font-size-btn px-2.5 py-1.5 rounded-md text-sm font-medium text-muted">A</button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between input-surface rounded-xl px-4 py-3">
+              <span class="font-medium">Бюджеты на главной</span>
+              <div class="flex rounded-lg p-0.5 gap-0.5 input-surface">
+                <button id="budget-cols-1" class="budget-cols-btn px-2.5 py-1.5 rounded-md text-xs font-medium text-muted">1 кол.</button>
+                <button id="budget-cols-2" class="budget-cols-btn px-2.5 py-1.5 rounded-md text-xs font-medium bg-primary-600 text-white">2 кол.</button>
+              </div>
+            </div>
+
+            <button id="btn-wallpaper" class="w-full flex items-center justify-between input-surface rounded-xl px-4 py-3.5 transition">
+              <span class="font-medium">Обои</span>
+              <span class="text-xs text-muted">Выбрать / Размыть →</span>
+            </button>
+          </div>
+
+          <!-- Data management -->
+          <p class="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Данные</p>
+          <div class="space-y-2 mb-5">
+            <button id="btn-manage-accounts" class="w-full flex items-center justify-between input-surface rounded-xl px-4 py-3.5 transition">
+              <span class="font-medium">Счета</span>
+              <span class="text-xs text-muted">Редактировать →</span>
+            </button>
+
+            <button id="btn-manage-folders" class="w-full flex items-center justify-between input-surface rounded-xl px-4 py-3.5 transition">
+              <span class="font-medium">Папки счетов</span>
+              <span class="text-xs text-muted">Группы →</span>
+            </button>
+
+            <button id="btn-manage-categories" class="w-full flex items-center justify-between input-surface rounded-xl px-4 py-3.5 transition">
+              <span class="font-medium">Категории</span>
+              <span class="text-xs text-muted">Создать / Изменить →</span>
+            </button>
+          </div>
+
+          <!-- Sync -->
+          <p class="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Синхронизация</p>
+          <div class="space-y-2 mb-5">
+            <button id="btn-export-json" class="w-full flex items-center justify-between input-surface rounded-xl px-4 py-3.5 transition">
+              <div class="text-left">
+                <span class="font-medium block">Резервная копия</span>
+                <span class="text-xs text-muted">Скачать JSON</span>
+              </div>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            </button>
+            <button id="btn-share-telegram" class="w-full flex items-center justify-between input-surface rounded-xl px-4 py-3.5 transition">
+              <div class="text-left">
+                <span class="font-medium block">Отправить в Telegram</span>
+                <span class="text-xs text-muted">Через «Поделиться»</span>
+              </div>
+              <span class="text-lg">✈️</span>
+            </button>
+            <button id="btn-import-json" class="w-full flex items-center justify-between input-surface rounded-xl px-4 py-3.5 transition">
+              <div class="text-left">
+                <span class="font-medium block">Восстановить</span>
+                <span class="text-xs text-muted">Из файла JSON</span>
+              </div>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            </button>
+            <input type="file" id="import-file-input" accept=".json,application/json" class="hidden" />
+            <button id="btn-export" class="w-full flex items-center justify-between input-surface rounded-xl px-4 py-3.5 transition">
+              <span class="font-medium">Экспорт в CSV</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            </button>
+          </div>
+
+          
+            <button id="btn-manage-budgets" class="w-full flex items-center justify-between input-surface rounded-xl px-4 py-3.5 transition">
+              <span class="font-medium">Бюджеты</span>
+              <span class="text-xs text-muted">Создать / Изменить →</span>
+            </button>
+
+            
+            
+            <div class="input-surface rounded-xl px-4 py-3.5">
+              <p class="font-medium mb-2">Порядок счетов и папок</p>
+              <p class="text-xs text-muted mb-3">Папки и счета можно менять местами</p>
+              <div id="accounts-order-list" class="space-y-2"></div>
+            </div>
+
+            <div class="input-surface rounded-xl px-4 py-3.5">
+              <p class="font-medium mb-2">Порядок блоков на главной</p>
+              <p class="text-xs text-muted mb-3">Нажми ↑ ↓ чтобы поменять местами</p>
+              <div id="block-order-list" class="space-y-2"></div>
+            </div>
+
+            <div class="input-surface rounded-xl px-4 py-3.5">
+              <p class="font-medium mb-2">Порядок типов операций</p>
+              <p class="text-xs text-muted mb-3">Расход / Доход / Перевод при создании</p>
+              <div id="action-order-list" class="space-y-2"></div>
+            </div>
+
+            <button id="btn-clear-data" class="w-full flex items-center justify-between bg-rose-600/10 text-rose-400 rounded-xl px-4 py-3.5 transition">
+            <span class="font-medium">Очистить все данные</span>
+          </button>
+
+          <p class="text-center text-xs text-muted mt-6">Фино v3.11</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MANAGE ACCOUNTS ==================== -->
+    <div id="modal-manage-accounts" class="fixed inset-0 z-[110] hidden">
+      <div class="absolute inset-0 bg-black/60 fade-in" data-close="modal-manage-accounts"></div>
+      <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t max-h-[85vh] overflow-y-auto slide-up safe-bottom">
+        <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mt-3"></div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold">Счета</h3>
+            <button data-close="modal-manage-accounts" class="p-2 rounded-xl input-surface"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
+          </div>
+          <div id="manage-accounts-list" class="space-y-2 mb-4"></div>
+          <button id="btn-add-account-from-manage" class="w-full bg-primary-600 hover:bg-primary-500 text-white font-semibold py-3 rounded-xl">+ Добавить счёт</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== EDIT ACCOUNT ==================== -->
+    <div id="modal-edit-account" class="fixed inset-0 z-[120] hidden">
+      <div class="absolute inset-0 bg-black/60 fade-in" data-close="modal-edit-account"></div>
+      <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t slide-up safe-bottom">
+        <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mt-3"></div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold">Редактировать счёт</h3>
+            <button data-close="modal-edit-account" class="p-2 rounded-xl input-surface"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
+          </div>
+          <div class="mb-4">
+            <label class="block text-xs text-muted mb-1.5">Название</label>
+            <input id="edit-account-name" type="text" class="w-full input-surface border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div class="mb-4">
+            <label class="block text-xs text-muted mb-1.5">Иконка</label>
+            <div id="edit-account-icons" class="flex flex-wrap gap-2">
+              <button data-icon="💵" class="edit-acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl">💵</button>
+              <button data-icon="💳" class="edit-acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl">💳</button>
+              <button data-icon="🏦" class="edit-acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl">🏦</button>
+              <button data-icon="💰" class="edit-acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl">💰</button>
+              <button data-icon="🎯" class="edit-acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl">🎯</button>
+              <button data-icon="📈" class="edit-acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl">📈</button>
+              <button data-icon="🏠" class="edit-acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl">🏠</button>
+              <button data-icon="✈️" class="edit-acc-icon w-11 h-11 rounded-xl input-surface border-2 border-transparent text-xl">✈️</button>
+            </div>
+          </div>
+          <button id="btn-save-edit-account" class="w-full bg-primary-600 hover:bg-primary-500 text-white font-semibold py-3.5 rounded-xl mb-2">Сохранить</button>
+          <button id="btn-delete-account" class="w-full bg-rose-600/20 text-rose-400 font-medium py-3 rounded-xl">Удалить счёт</button>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ==================== WALLPAPER ==================== -->
+    <div id="modal-wallpaper" class="fixed inset-0 z-[120] hidden">
+      <div class="absolute inset-0 bg-black/60 fade-in" data-close="modal-wallpaper"></div>
+      <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t slide-up safe-bottom">
+        <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mt-3"></div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold">Обои</h3>
+            <button data-close="modal-wallpaper" class="p-2 rounded-xl input-surface"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
+          </div>
+          <input type="file" id="wallpaper-input" accept="image/*" class="hidden" />
+          <button id="btn-pick-wallpaper" class="w-full input-surface hover:bg-slate-700 rounded-xl py-3.5 font-medium mb-4">Выбрать изображение</button>
+          <div class="mb-4">
+            <div class="flex justify-between text-sm mb-2">
+              <span class="text-muted">Размытие</span>
+              <span id="blur-value" class="text-main">0 px</span>
+            </div>
+            <input id="blur-range" type="range" min="0" max="20" value="0" class="w-full accent-primary-500" />
+          </div>
+          <button id="btn-remove-wallpaper" class="w-full bg-rose-600/20 text-rose-400 font-medium py-3 rounded-xl">Убрать обои</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  
+    <!-- CREATE / EDIT BUDGET -->
+    <div id="modal-budget" class="fixed inset-0 z-[120] hidden">
+      <div class="absolute inset-0 bg-black/60 fade-in" data-close="modal-budget"></div>
+      <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t slide-up safe-bottom">
+        <div class="w-10 h-1 bg-slate-600 rounded-full mx-auto mt-3"></div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-5">
+            <h3 id="budget-modal-title" class="text-lg font-bold">Новый бюджет</h3>
+            <button data-close="modal-budget" class="p-2 rounded-xl input-surface">✕</button>
+          </div>
+          <div class="mb-4">
+            <label class="block text-xs text-muted mb-1.5">Категория</label>
+            <select id="budget-category" class="w-full input-surface border rounded-xl px-4 py-3 text-sm"></select>
+          </div>
+          <div class="mb-4">
+            <label class="block text-xs text-muted mb-1.5">Лимит на месяц (₽)</label>
+            <input id="budget-limit" type="number" inputmode="decimal" placeholder="20000" class="w-full input-surface border rounded-xl px-4 py-3 text-sm" />
+          </div>
+          <label class="flex items-center gap-3 mb-6 cursor-pointer">
+            <input id="budget-show-home" type="checkbox" checked class="w-5 h-5 rounded accent-sky-500" />
+            <span class="text-sm">Показывать на главном экране</span>
+          </label>
+          <button id="btn-save-budget" class="w-full bg-primary-600 text-white font-semibold py-3.5 rounded-xl mb-2">Сохранить</button>
+          <button id="btn-delete-budget" class="hidden w-full bg-rose-600/20 text-rose-400 font-medium py-3 rounded-xl">Удалить бюджет</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MANAGE BUDGETS -->
+    <div id="modal-manage-budgets" class="fixed inset-0 z-[110] hidden">
+      <div class="absolute inset-0 bg-black/60 fade-in" data-close="modal-manage-budgets"></div>
+      <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t max-h-[85vh] overflow-y-auto slide-up safe-bottom">
+        <div class="w-10 h-1 bg-slate-600 rounded-full mx-auto mt-3"></div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold">Бюджеты</h3>
+            <button data-close="modal-manage-budgets" class="p-2 rounded-xl input-surface">✕</button>
+          </div>
+          <div id="manage-budgets-list" class="space-y-2 mb-4"></div>
+          <button id="btn-create-budget" class="w-full bg-primary-600 text-white font-semibold py-3 rounded-xl">+ Создать бюджет</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS SCREEN (simple) -->
+    <div id="screen-analytics" class="fixed inset-0 z-[90] hidden bg-[var(--bg)]">
+      <div class="max-w-lg mx-auto min-h-screen flex flex-col">
+        <header class="sticky top-0 z-30 header-surface px-4 pt-3 pb-3 flex items-center gap-3">
+          <button id="btn-back-from-analytics" class="p-2 -ml-2 rounded-xl">←</button>
+          <h1 class="text-lg font-bold">Аналитика</h1>
+        </header>
+        <main class="flex-1 px-4 py-4 overflow-y-auto">
+          <div class="flex gap-2 mb-4 flex-wrap">
+            <button data-period="month" class="an-period px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-600 text-white">Этот месяц</button>
+            <button data-period="prev_month" class="an-period px-3 py-1.5 rounded-lg text-xs font-medium input-surface text-muted">Прошлый месяц</button>
+            <button data-period="year" class="an-period px-3 py-1.5 rounded-lg text-xs font-medium input-surface text-muted">Этот год</button>
+            <button data-period="prev_year" class="an-period px-3 py-1.5 rounded-lg text-xs font-medium input-surface text-muted">Прошлый год</button>
+            <button data-period="all" class="an-period px-3 py-1.5 rounded-lg text-xs font-medium input-surface text-muted">Всё время</button>
+          </div>
+          <div class="card-surface border rounded-2xl p-4 mb-4">
+            <p class="text-sm text-muted mb-2">Расходы по категориям</p>
+            <div id="analytics-by-category" class="space-y-2"></div>
+          </div>
+          <div class="card-surface border rounded-2xl p-4">
+            <p class="text-sm text-muted mb-2">Итого за период</p>
+            <div class="flex justify-between"><span>Доходы</span><span id="an-income" class="text-emerald-400 font-semibold">0</span></div>
+            <div class="flex justify-between mt-1"><span>Расходы</span><span id="an-expense" class="text-rose-400 font-semibold">0</span></div>
+            <div class="flex justify-between mt-2 pt-2 border-t border-slate-700"><span>Разница</span><span id="an-diff" class="font-bold">0</span></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+  
+    <div id="modal-manage-categories" class="fixed inset-0 z-[110] hidden">
+      <div class="absolute inset-0 bg-black/60 fade-in" data-close="modal-manage-categories"></div>
+      <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t max-h-[90vh] overflow-y-auto slide-up safe-bottom">
+        <div class="w-10 h-1 bg-slate-600 rounded-full mx-auto mt-3"></div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold">Категории</h3>
+            <button data-close="modal-manage-categories" class="p-2 rounded-xl input-surface">✕</button>
+          </div>
+          <div class="flex gap-2 mb-4">
+            <button id="cat-tab-expense" class="cat-tab flex-1 py-2 rounded-lg text-sm font-medium bg-rose-600 text-white">Расходы</button>
+            <button id="cat-tab-income" class="cat-tab flex-1 py-2 rounded-lg text-sm font-medium input-surface text-main">Доходы</button>
+          </div>
+          <div id="manage-categories-list" class="space-y-2 mb-4"></div>
+          <button id="btn-open-add-category" class="w-full bg-primary-600 text-white font-semibold py-3 rounded-xl">+ Добавить категорию</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADD / EDIT CATEGORY -->
+    <div id="modal-edit-category" class="fixed inset-0 z-[120] hidden">
+      <div class="absolute inset-0 bg-black/60 fade-in" data-close="modal-edit-category"></div>
+      <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t max-h-[90vh] overflow-y-auto slide-up safe-bottom">
+        <div class="w-10 h-1 bg-slate-600 rounded-full mx-auto mt-3"></div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-5">
+            <h3 id="cat-edit-title" class="text-lg font-bold">Категория</h3>
+            <button data-close="modal-edit-category" class="p-2 rounded-xl input-surface">✕</button>
+          </div>
+          <div class="mb-4">
+            <label class="block text-xs text-muted mb-1.5">Название</label>
+            <input id="cat-edit-name" type="text" class="w-full input-surface border rounded-xl px-4 py-3 text-sm" placeholder="Название" />
+          </div>
+          <div class="mb-4">
+            <label class="block text-xs text-muted mb-1.5">Иконка</label>
+            <div id="cat-icon-grid" class="grid grid-cols-8 gap-2 max-h-40 overflow-y-auto no-scrollbar"></div>
+          </div>
+          <div id="cat-subcategories-block" class="mb-4">
+            <label class="block text-xs text-muted mb-1.5">Подкатегории</label>
+            <div id="cat-subs-list" class="space-y-2 mb-2"></div>
+            <div class="flex gap-2">
+              <input id="cat-sub-name" type="text" placeholder="Новая подкатегория" class="flex-1 input-surface border rounded-xl px-3 py-2 text-sm" />
+              <button id="btn-add-sub" class="px-3 bg-primary-600 text-white rounded-xl text-sm">+</button>
+            </div>
+          </div>
+          <button id="btn-save-category" class="w-full bg-primary-600 text-white font-semibold py-3.5 rounded-xl mb-2">Сохранить</button>
+          <button id="btn-delete-category-full" class="hidden w-full bg-rose-600/20 text-rose-400 font-medium py-3 rounded-xl">Удалить категорию</button>
+        </div>
+      </div>
+    </div>
+
+  
+    <div id="modal-manage-folders" class="fixed inset-0 z-[110] hidden">
+      <div class="absolute inset-0 bg-black/60 fade-in" data-close="modal-manage-folders"></div>
+      <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t max-h-[85vh] overflow-y-auto slide-up safe-bottom">
+        <div class="w-10 h-1 bg-slate-600 rounded-full mx-auto mt-3"></div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold">Папки счетов</h3>
+            <button data-close="modal-manage-folders" class="p-2 rounded-xl input-surface">✕</button>
+          </div>
+          <div id="manage-folders-list" class="space-y-2 mb-4"></div>
+          <button id="btn-create-folder" class="w-full bg-primary-600 text-white font-semibold py-3 rounded-xl">+ Создать папку</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-folder" class="fixed inset-0 z-[120] hidden">
+      <div class="absolute inset-0 bg-black/60 fade-in" data-close="modal-folder"></div>
+      <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t max-h-[90vh] overflow-y-auto slide-up safe-bottom">
+        <div class="w-10 h-1 bg-slate-600 rounded-full mx-auto mt-3"></div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-5">
+            <h3 id="folder-modal-title" class="text-lg font-bold">Новая папка</h3>
+            <button data-close="modal-folder" class="p-2 rounded-xl input-surface">✕</button>
+          </div>
+          <div class="mb-3">
+            <label class="block text-xs text-muted mb-1.5">Название</label>
+            <input id="folder-name" type="text" placeholder="Накопления" class="w-full input-surface border rounded-xl px-4 py-3 text-sm" />
+          </div>
+          <div class="mb-3">
+            <label class="block text-xs text-muted mb-1.5">Иконка (эмодзи)</label>
+            <input id="folder-icon" type="text" value="📁" class="w-full input-surface border rounded-xl px-4 py-3 text-sm" />
+          </div>
+          <div class="mb-5">
+            <label class="block text-xs text-muted mb-1.5">Счета в папке</label>
+            <div id="folder-accounts-checks" class="max-h-48 overflow-y-auto space-y-0.5"></div>
+          </div>
+          <button id="btn-save-folder" class="w-full bg-primary-600 text-white font-semibold py-3.5 rounded-xl">Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+  <div id="wallpaper-layer" class="fixed inset-0 -z-10 pointer-events-none hidden">
+    <div id="wallpaper-img" class="absolute inset-0 bg-cover bg-center"></div>
+    <div id="wallpaper-overlay" class="absolute inset-0 bg-black/40"></div>
+  </div>
+
+  <script>
+const CAT_ICONS = [
+  '🍔','🍕','🥗','☕','🍺','🛒','🚗','🚌','🚕','⛽','✈️','🏠','💡','💧','🧹',
+  '💊','🏥','💉','🎬','🎮','🎵','📚','🎓','👕','👟','💍','📱','💻','🖥️','🎁',
+  '💰','💵','💳','📈','🏦','🏢','🐶','🐱','👶','💇','🏋️','⚽','🎨','📦','🔧',
+  '🚌','🚇','🚲','🛵','🚢','🏨','🌴','🎁','🧾','📌','⭐','❤️','🔥','✅','🏷️'
+];
+
+// ==================== Фино v2 — Учёт финансов со счетами ====================
+
+const STORAGE_KEY = 'fino_data_v2';
+
+const DEFAULT_CATEGORIES = {
+  expense: [
+    { id: 'food', name: 'Еда', emoji: '🍔', color: '#f97316' },
+    { id: 'transport', name: 'Транспорт', emoji: '🚗', color: '#3b82f6' },
+    { id: 'home', name: 'Дом', emoji: '🏠', color: '#8b5cf6' },
+    { id: 'health', name: 'Здоровье', emoji: '💊', color: '#ef4444' },
+    { id: 'entertainment', name: 'Развлечения', emoji: '🎬', color: '#ec4899' },
+    { id: 'shopping', name: 'Покупки', emoji: '🛍️', color: '#14b8a6' },
+    { id: 'education', name: 'Образование', emoji: '📚', color: '#6366f1' },
+    { id: 'other_exp', name: 'Другое', emoji: '📦', color: '#64748b' },
+  ],
+  income: [
+    { id: 'salary', name: 'Зарплата', emoji: '💰', color: '#22c55e' },
+    { id: 'freelance', name: 'Фриланс', emoji: '💻', color: '#06b6d4' },
+    { id: 'invest', name: 'Инвестиции', emoji: '📈', color: '#a855f7' },
+    { id: 'gift', name: 'Подарок', emoji: '🎁', color: '#f43f5e' },
+    { id: 'other_inc', name: 'Другое', emoji: '💵', color: '#64748b' },
+  ]
+};
+
+const DEFAULT_ACCOUNTS = [
+  { id: 'cash', name: 'Наличные', icon: '💵', balance: 0, initialBalance: 0 },
+  { id: 'card', name: 'Карта', icon: '💳', balance: 0, initialBalance: 0 },
+];
+
+let state = {
+  accounts: [],
+  folders: [],
+  accountsOrder: [],
+  expandedFolders: {},
+  transactions: [],
+  categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
+  selectedAccountId: null,
+  currentAction: null,
+  selectedCategoryId: null,
+  selectedSubcategoryId: null,
+  selectedIcon: '💵',
+  txFilter: 'all',
+  budgets: [],
+  editingBudgetId: null,
+  blockOrder: ['budgets', 'accounts', 'operations'],
+  actionOrder: ['expense', 'income', 'transfer'],
+  editingCategoryId: null,
+  editingCategoryIcon: '📦',
+  editingCategorySubs: [],
+  analyticsPeriod: 'month',
+  editingAccountId: null,
+  catTab: 'expense',
+  theme: 'dark',
+  fontScale: 'md',
+  budgetCols: 2,
+  wallpaper: null, // dataURL
+  wallpaperBlur: 0,
+};
+
+// ==================== Storage ====================
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      state.accounts = data.accounts || JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS));
+      if (data.folders) state.folders = data.folders;
+      if (data.accountsOrder) state.accountsOrder = data.accountsOrder;
+      state.transactions = data.transactions || [];
+      if (data.categories) state.categories = data.categories;
+      if (data.budgets) state.budgets = data.budgets;
+      if (data.blockOrder) state.blockOrder = data.blockOrder;
+      if (Array.isArray(data.actionOrder) && data.actionOrder.length) {
+        const allowed = ['expense','income','transfer'];
+        const cleaned = data.actionOrder.filter(x => allowed.includes(x));
+        allowed.forEach(a => { if (!cleaned.includes(a)) cleaned.push(a); });
+        state.actionOrder = cleaned;
+      }
+      if (data.theme) state.theme = data.theme;
+      if (data.fontScale) state.fontScale = data.fontScale === 'xs' ? 'sm' : data.fontScale;
+      if (data.budgetCols) state.budgetCols = data.budgetCols;
+      if (data.wallpaper !== undefined) state.wallpaper = data.wallpaper;
+      else state.wallpaper = localStorage.getItem(STORAGE_KEY + '_wp') || null;
+      if (data.wallpaperBlur !== undefined) state.wallpaperBlur = data.wallpaperBlur;
+    } else {
+      state.accounts = JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS));
+    }
+  } catch (e) {
+    console.error(e);
+    state.accounts = JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS));
+  }
+  applyTheme();
+  applyFontScale();
+  applyBudgetCols();
+  applyWallpaper();
+}
+
+function saveData() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      accounts: state.accounts,
+      folders: state.folders,
+      accountsOrder: state.accountsOrder,
+      transactions: state.transactions,
+      categories: state.categories,
+      budgets: state.budgets,
+      blockOrder: state.blockOrder,
+      actionOrder: state.actionOrder,
+      theme: state.theme,
+      fontScale: state.fontScale,
+      budgetCols: state.budgetCols,
+      wallpaperBlur: state.wallpaperBlur,
+    }));
+    // wallpaper separately (can be large)
+    if (state.wallpaper) {
+      try { localStorage.setItem(STORAGE_KEY + '_wp', state.wallpaper); }
+      catch (e) { console.warn('wallpaper too large', e); }
+    } else {
+      localStorage.removeItem(STORAGE_KEY + '_wp');
+    }
+  } catch (e) {
+    console.error('saveData', e);
+  }
+}
+
+// ==================== Helpers ====================
+
+function formatMoney(amount) {
+  const sign = amount > 0 ? '+' : amount < 0 ? '−' : '';
+  const abs = Math.abs(amount);
+  return sign + new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(abs) + ' ₽';
+}
+
+function formatMoneyPlain(amount) {
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(amount) + ' ₽';
+}
+
+function uuid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function getAccount(id) {
+  return state.accounts.find(a => a.id === id);
+}
+
+function getCategory(id) {
+  return [...state.categories.expense, ...state.categories.income].find(c => c.id === id);
+}
+
+function recalculateBalances() {
+  const balances = {};
+  state.accounts.forEach(a => {
+    if (a.initialBalance === undefined) a.initialBalance = a.balance || 0;
+    balances[a.id] = a.initialBalance;
+  });
+
+  state.transactions.forEach(t => {
+    if (t.type === 'income') {
+      balances[t.accountId] = (balances[t.accountId] || 0) + t.amount;
+    } else if (t.type === 'expense') {
+      balances[t.accountId] = (balances[t.accountId] || 0) - t.amount;
+    } else if (t.type === 'transfer') {
+      balances[t.accountId] = (balances[t.accountId] || 0) - t.amount;
+      balances[t.toAccountId] = (balances[t.toAccountId] || 0) + t.amount;
+    }
+  });
+
+  state.accounts.forEach(a => {
+    a.balance = balances[a.id] || 0;
+  });
+}
+
+// ==================== Summaries ====================
+
+function getPeriodStats(startDate, endDate) {
+  let income = 0, expense = 0;
+  state.transactions.forEach(t => {
+    if (t.date < startDate || t.date > endDate) return;
+    if (t.type === 'income') income += t.amount;
+    else if (t.type === 'expense') expense += t.amount;
+  });
+  return { income, expense, diff: income - expense };
+}
+
+function renderSummaries() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+
+  const monthStart = `${year}-${month}-01`;
+  const monthEnd = `${year}-${month}-31`;
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year}-12-31`;
+
+  const m = getPeriodStats(monthStart, monthEnd);
+  const y = getPeriodStats(yearStart, yearEnd);
+
+  document.getElementById('month-income').textContent = '+' + formatMoneyPlain(m.income);
+  document.getElementById('month-expense').textContent = '−' + formatMoneyPlain(m.expense);
+  const mDiffEl = document.getElementById('month-diff');
+  mDiffEl.textContent = formatMoney(m.diff);
+  mDiffEl.className = `text-sm font-bold ${m.diff >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+  document.getElementById('year-income').textContent = '+' + formatMoneyPlain(y.income);
+  document.getElementById('year-expense').textContent = '−' + formatMoneyPlain(y.expense);
+  const yDiffEl = document.getElementById('year-diff');
+  yDiffEl.textContent = formatMoney(y.diff);
+  yDiffEl.className = `text-sm font-bold ${y.diff >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+}
+
+// ==================== Accounts ====================
+
+
+
+function ensureAccountsOrder() {
+  const folders = state.folders || [];
+  const inFolder = new Set();
+  folders.forEach(f => (f.accountIds || []).forEach(id => inFolder.add(id)));
+  const valid = new Set([
+    ...folders.map(f => 'f:' + f.id),
+    ...state.accounts.filter(a => !inFolder.has(a.id)).map(a => 'a:' + a.id),
+  ]);
+  let order = (state.accountsOrder || []).filter(k => valid.has(k));
+  valid.forEach(k => { if (!order.includes(k)) order.push(k); });
+  state.accountsOrder = order;
+  return order;
+}
+
+function renderAccounts() {
+  recalculateBalances();
+  const list = document.getElementById('accounts-list');
+  const empty = document.getElementById('accounts-empty');
+  if (!list) return;
+
+  if (state.accounts.length === 0) {
+    list.innerHTML = '';
+    if (empty) empty.classList.remove('hidden');
+    return;
+  }
+  if (empty) empty.classList.add('hidden');
+
+  const folders = state.folders || [];
+  const expanded = state.expandedFolders || {};
+  const folderMap = Object.fromEntries(folders.map(f => [f.id, f]));
+  const order = ensureAccountsOrder();
+
+  let html = '';
+  order.forEach(key => {
+    if (key.startsWith('f:')) {
+      const folder = folderMap[key.slice(2)];
+      if (!folder) return;
+      const accs = (folder.accountIds || []).map(id => getAccount(id)).filter(Boolean);
+      const total = accs.reduce((s, a) => s + (a.balance || 0), 0);
+      const isOpen = !!expanded[folder.id];
+      html += `
+      <div class="card-surface border rounded-xl overflow-hidden">
+        <button type="button" onclick="toggleFolder('${folder.id}')"
+          class="w-full flex items-center gap-2.5 px-3 py-2 active:scale-[0.99] transition text-left">
+          <div class="w-8 h-8 rounded-lg input-surface flex items-center justify-center text-base shrink-0">${folder.icon || '📁'}</div>
+          <div class="flex-1 min-w-0 overflow-hidden">
+            <p class="font-medium text-sm text-main fit-line">${folder.name}</p>
+            <p class="text-[10px] text-muted fit-line">${accs.length} ${accs.length === 1 ? 'счёт' : accs.length < 5 ? 'счёта' : 'счетов'}</p>
+          </div>
+          <p class="font-semibold text-sm shrink-0 tabular-nums max-w-[38%] fit-line text-right ${total >= 0 ? 'text-main' : 'text-rose-400'}">${formatMoneyPlain(total)}</p>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-muted shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+          </svg>
+        </button>
+        ${isOpen ? `<div class="border-t border-[var(--card-border)] px-2 pb-2 space-y-1">
+          ${accs.map(a => accountRowHtml(a, true)).join('') || '<p class="text-xs text-muted px-2 py-2">Пусто</p>'}
+        </div>` : ''}
+      </div>`;
+    } else if (key.startsWith('a:')) {
+      const acc = getAccount(key.slice(2));
+      if (acc) html += accountRowHtml(acc, false);
+    }
+  });
+
+  list.innerHTML = html;
+}
+
+function accountRowHtml(a, nested) {
+  const pad = nested ? 'pl-2' : '';
+  return `
+    <button onclick="openAccountSheet('${a.id}')"
+      class="w-full flex items-center gap-2 card-surface border rounded-xl px-2.5 py-1.5 active:scale-[0.98] transition text-left min-w-0 overflow-hidden ${pad}">
+      <div class="w-7 h-7 rounded-lg input-surface flex items-center justify-center text-sm shrink-0">${a.icon}</div>
+      <p class="flex-1 fit-line font-medium text-sm text-main">${a.name}</p>
+      <p class="font-semibold text-sm shrink-0 tabular-nums max-w-[40%] fit-line text-right ${a.balance >= 0 ? 'text-main' : 'text-rose-400'}">${formatMoneyPlain(a.balance)}</p>
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+      </svg>
+    </button>`;
+}
+
+function toggleFolder(id) {
+  if (!state.expandedFolders) state.expandedFolders = {};
+  state.expandedFolders[id] = !state.expandedFolders[id];
+  renderAccounts();
+}
+
+function openManageFolders() {
+  try {
+    renderManageFolders();
+    closeModal('modal-settings');
+    openModal('modal-manage-folders');
+  } catch (e) {
+    console.error(e);
+    alert('Ошибка папок: ' + e.message);
+  }
+}
+
+function renderManageFolders() {
+  const list = document.getElementById('manage-folders-list');
+  if (!list) return;
+  const folders = state.folders || [];
+  if (!folders.length) {
+    list.innerHTML = '<p class="text-muted text-sm text-center py-3">Нет папок</p>';
+    return;
+  }
+  list.innerHTML = folders.map(f => {
+    const count = (f.accountIds || []).length;
+    return `
+      <div class="input-surface rounded-xl px-3 py-2.5 flex items-center gap-2">
+        <span class="text-lg">${f.icon || '📁'}</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-main">${f.name}</p>
+          <p class="text-[10px] text-muted">${count} счетов</p>
+        </div>
+        <button type="button" onclick="openEditFolder('${f.id}')" class="px-2 py-1 text-xs input-surface border rounded-lg">Изменить</button>
+        <button type="button" onclick="deleteFolder('${f.id}')" class="px-2 py-1 text-xs text-rose-400">✕</button>
+      </div>`;
+  }).join('');
+}
+
+function openCreateFolder() {
+  state.editingFolderId = null;
+  const nameEl = document.getElementById('folder-name');
+  const iconEl = document.getElementById('folder-icon');
+  if (nameEl) nameEl.value = '';
+  if (iconEl) iconEl.value = '📁';
+  renderFolderAccountChecks([]);
+  const title = document.getElementById('folder-modal-title');
+  if (title) title.textContent = 'Новая папка';
+  openModal('modal-folder');
+}
+
+function openEditFolder(id) {
+  const f = (state.folders || []).find(x => x.id === id);
+  if (!f) return;
+  state.editingFolderId = id;
+  document.getElementById('folder-name').value = f.name;
+  document.getElementById('folder-icon').value = f.icon || '📁';
+  renderFolderAccountChecks(f.accountIds || []);
+  document.getElementById('folder-modal-title').textContent = 'Редактировать папку';
+  openModal('modal-folder');
+}
+
+function renderFolderAccountChecks(selectedIds) {
+  const box = document.getElementById('folder-accounts-checks');
+  if (!box) return;
+  const selected = new Set(selectedIds || []);
+  box.innerHTML = (state.accounts || []).map(a => `
+    <label class="flex items-center gap-2 py-1.5 cursor-pointer">
+      <input type="checkbox" value="${a.id}" ${selected.has(a.id) ? 'checked' : ''} class="folder-acc-check rounded accent-sky-500" />
+      <span class="text-sm">${a.icon} ${a.name}</span>
+    </label>
+  `).join('') || '<p class="text-xs text-muted">Сначала создайте счета</p>';
+}
+
+function saveFolder() {
+  try {
+    const name = (document.getElementById('folder-name')?.value || '').trim();
+    const icon = (document.getElementById('folder-icon')?.value || '').trim() || '📁';
+    if (!name) { alert('Введите название папки'); return; }
+    const accountIds = [...document.querySelectorAll('.folder-acc-check:checked')].map(el => el.value);
+    if (!state.folders) state.folders = [];
+    (state.folders || []).forEach(f => {
+      if (f.id !== state.editingFolderId) {
+        f.accountIds = (f.accountIds || []).filter(id => !accountIds.includes(id));
+      }
+    });
+    if (state.editingFolderId) {
+      const f = state.folders.find(x => x.id === state.editingFolderId);
+      if (f) { f.name = name; f.icon = icon; f.accountIds = accountIds; }
+    } else {
+      const newId = uuid();
+      state.folders.push({ id: newId, name, icon, accountIds });
+      if (!state.accountsOrder) state.accountsOrder = [];
+      state.accountsOrder.push('f:' + newId);
+    }
+    saveData();
+    closeModal('modal-folder');
+    renderAccounts();
+    renderManageFolders();
+    openModal('modal-manage-folders');
+  } catch (e) {
+    console.error(e);
+    alert('Ошибка сохранения папки: ' + e.message);
+  }
+}
+
+function deleteFolder(id) {
+  if (!confirm('Удалить папку? Счета останутся.')) return;
+  state.folders = (state.folders || []).filter(f => f.id !== id);
+  saveData();
+  renderManageFolders();
+  renderAccounts();
+}
+
+
+
+
+
+function renderTransactionItem(t) {
+  const isTransfer = t.type === 'transfer';
+  const isIncome = t.type === 'income';
+  let title = '';
+  let emoji = '📦';
+  let colorClass = 'text-main';
+
+  if (isTransfer) {
+    const from = getAccount(t.accountId);
+    const to = getAccount(t.toAccountId);
+    title = `${from?.name || '?'} → ${to?.name || '?'}`;
+    emoji = '⇄';
+    colorClass = 'text-primary-400';
+  } else {
+    const cat = getCategory(t.categoryId);
+    let subName = '';
+    if (t.subcategoryId && cat && cat.subcategories) {
+      const sub = cat.subcategories.find(s => s.id === t.subcategoryId);
+      if (sub) subName = ' / ' + sub.name;
+    }
+    title = (cat?.name || 'Без категории') + subName;
+    emoji = cat?.emoji || '📦';
+    colorClass = isIncome ? 'text-emerald-400' : 'text-rose-400';
+  }
+
+  const acc = getAccount(t.accountId);
+  const note = t.note || (acc ? acc.name : '');
+
+  return `
+    <div class="flex items-center gap-2 card-surface border rounded-xl px-2.5 py-1.5">
+      <div class="w-8 h-8 rounded-lg input-surface flex items-center justify-center text-base shrink-0">${emoji}</div>
+      <div class="flex-1 min-w-0 overflow-hidden">
+        <p class="font-medium text-sm text-main fit-line">${title}</p>
+        <p class="text-[10px] text-muted fit-line">${note} · ${t.date}</p>
+      </div>
+      <p class="font-semibold text-sm shrink-0 tabular-nums max-w-[36%] fit-line text-right ${colorClass}">
+        ${isIncome ? '+' : isTransfer ? '' : '−'}${formatMoneyPlain(t.amount)}
+      </p>
+      <button type="button" data-delete-tx="${t.id}" class="w-8 h-8 rounded-lg text-rose-400 text-sm shrink-0 active:scale-90" title="Удалить">✕</button>
+    </div>
+  `;
+}
+
+function deleteTransaction(id) {
+  if (!id) return;
+  if (!confirm('Удалить эту операцию?')) return;
+  state.transactions = state.transactions.filter(t => t.id !== id);
+  saveData();
+  try {
+    renderAll();
+    if (!document.getElementById('screen-transactions')?.classList.contains('hidden')) {
+      renderAllTransactions();
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+
+
+function renderRecent() {
+  const list = document.getElementById('recent-list');
+  const empty = document.getElementById('recent-empty');
+  const recent = [...state.transactions]
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
+    .slice(0, 3);
+
+  if (recent.length === 0) {
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  list.innerHTML = recent.map(renderTransactionItem).join('');
+}
+
+function renderAllTransactions() {
+  const list = document.getElementById('all-transactions-list');
+  let txs = [...state.transactions].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  if (state.txFilter !== 'all') {
+    txs = txs.filter(t => t.type === state.txFilter);
+  }
+  list.innerHTML = txs.length
+    ? txs.map(renderTransactionItem).join('')
+    : '<p class="text-center text-slate-500 py-10 text-sm">Нет операций</p>';
+}
+
+// ==================== UI ====================
+
+function showScreen(name) {
+  document.getElementById('screen-home').classList.toggle('hidden', name !== 'home');
+  document.getElementById('screen-transactions').classList.toggle('hidden', name !== 'transactions');
+}
+
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('hidden');
+  el.style.pointerEvents = 'auto';
+  el.style.display = '';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.add('hidden');
+    el.style.pointerEvents = 'none';
+  }
+  // After closing account sheet or any UI, always re-check overlays
+  if (id === 'sheet-account') {
+    forceUnlockIfIdle();
+  } else {
+    forceUnlockIfIdle();
+  }
+}
+
+function closeAllModals() {
+  document.querySelectorAll('[id^="modal-"], [id^="sheet-"]').forEach(m => {
+    m.classList.add('hidden');
+    m.style.pointerEvents = 'none';
+  });
+  const an = document.getElementById('screen-analytics');
+  if (an) { an.classList.add('hidden'); an.style.pointerEvents = 'none'; }
+  document.body.style.overflow = '';
+  document.body.style.pointerEvents = '';
+}
+
+function forceUnlockIfIdle() {
+  const blockers = [...document.querySelectorAll('[id^="modal-"], [id^="sheet-"]')];
+  const anyOpen = blockers.some(m => !m.classList.contains('hidden'));
+  if (!anyOpen) {
+    blockers.forEach(m => { m.style.pointerEvents = 'none'; });
+    document.body.style.overflow = '';
+    document.body.style.pointerEvents = '';
+  }
+}
+
+function unlockBodyIfNoModals() {
+  forceUnlockIfIdle();
+}
+
+
+
+function normalizeActionOrder(order) {
+  const allowed = ['expense', 'income', 'transfer'];
+  const src = Array.isArray(order) ? order : [];
+  const out = [];
+  src.forEach(t => { if (allowed.includes(t) && !out.includes(t)) out.push(t); });
+  allowed.forEach(t => { if (!out.includes(t)) out.push(t); });
+  return out;
+}
+
+const ACTION_META = {
+  expense: { label: 'Расход', icon: '↓', bg: '#e11d48' },
+  income: { label: 'Доход', icon: '↑', bg: '#059669' },
+  transfer: { label: 'Перевод', icon: '⇄', bg: '#0284c7' },
+};
+
+function renderActionOrderList() {
+  const list = document.getElementById('action-order-list');
+  if (!list) return;
+  state.actionOrder = normalizeActionOrder(state.actionOrder);
+  const order = state.actionOrder;
+  list.innerHTML = order.map((key, i) =>
+    '<div class="flex items-center gap-2 input-surface rounded-xl px-3 py-2">' +
+      '<span class="flex-1 text-sm text-main">' + (ACTION_META[key] ? ACTION_META[key].label : key) + '</span>' +
+      '<button type="button" data-move-action="' + i + '" data-move-dir="-1" class="w-8 h-8 rounded-lg input-surface border text-sm' + (i === 0 ? ' opacity-30 pointer-events-none' : '') + '">↑</button>' +
+      '<button type="button" data-move-action="' + i + '" data-move-dir="1" class="w-8 h-8 rounded-lg input-surface border text-sm' + (i === order.length - 1 ? ' opacity-30 pointer-events-none' : '') + '">↓</button>' +
+    '</div>'
+  ).join('');
+}
+
+function moveActionItem(index, dir) {
+  try {
+    const order = normalizeActionOrder(state.actionOrder);
+    const i = Number(index);
+    const d = Number(dir);
+    const ni = i + d;
+    if (!Number.isFinite(i) || !Number.isFinite(d) || ni < 0 || ni >= order.length) return;
+    const tmp = order[i];
+    order[i] = order[ni];
+    order[ni] = tmp;
+    state.actionOrder = order;
+    saveData();
+    renderActionOrderList();
+  } catch (e) {
+    console.error(e);
+    state.actionOrder = ['expense', 'income', 'transfer'];
+    saveData();
+    renderActionOrderList();
+  }
+}
+
+function openAccountSheet(accountId) {
+  const acc = getAccount(accountId);
+  if (!acc) return;
+  state.selectedAccountId = accountId;
+
+  const sheet = document.getElementById('sheet-account');
+  if (!sheet) return;
+
+  const order = normalizeActionOrder(state.actionOrder);
+  state.actionOrder = order;
+
+  let buttonsHtml = '';
+  order.forEach(function(type) {
+    const m = ACTION_META[type];
+    buttonsHtml +=
+      '<button type="button" data-start-action="' + type + '" ' +
+      'class="w-full flex items-center gap-3 text-white font-semibold py-3 px-4 rounded-xl" ' +
+      'style="background:' + m.bg + ';color:#fff">' +
+      '<span class="w-7 h-7 rounded-full flex items-center justify-center text-sm" style="background:rgba(255,255,255,0.2)">' + m.icon + '</span> ' +
+      m.label +
+      '</button>';
+  });
+
+  sheet.innerHTML =
+    '<div class="absolute inset-0 bg-black/60" data-close="sheet-account"></div>' +
+    '<div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto modal-surface rounded-t-3xl border-t safe-bottom" style="background:var(--card);color:var(--text)">' +
+      '<div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mt-3 mb-2"></div>' +
+      '<div class="px-5 pt-2 pb-6">' +
+        '<div class="text-center mb-4">' +
+          '<p class="text-lg font-bold">' + acc.name + '</p>' +
+          '<p class="text-xl font-bold mt-1" style="color:#38bdf8">' + formatMoneyPlain(acc.balance) + '</p>' +
+        '</div>' +
+        '<div id="sheet-actions" class="space-y-2">' + buttonsHtml + '</div>' +
+        '<button type="button" data-close="sheet-account" class="w-full py-3 font-medium rounded-xl mt-2" style="color:var(--muted)">Отмена</button>' +
+      '</div>' +
+    '</div>';
+
+  sheet.classList.remove('hidden');
+  sheet.style.pointerEvents = 'auto';
+  sheet.style.display = '';
+  document.body.style.overflow = 'hidden';
+}
+
+function startAction(type) {
+  state.currentAction = type;
+  state.selectedCategoryId = null;
+  state.selectedSubcategoryId = null;
+
+  const sheet = document.getElementById('sheet-account');
+  if (sheet) {
+    sheet.classList.add('hidden');
+    sheet.style.pointerEvents = 'none';
+  }
+
+  const titleMap = { expense: 'Расход', income: 'Доход', transfer: 'Перевод' };
+  const titleEl = document.getElementById('modal-tx-title');
+  if (titleEl) titleEl.textContent = titleMap[type] || type;
+
+  const amountEl = document.getElementById('input-amount');
+  const noteEl = document.getElementById('input-note');
+  const dateEl = document.getElementById('input-date');
+  if (amountEl) amountEl.value = '';
+  if (noteEl) noteEl.value = '';
+  if (dateEl) dateEl.value = new Date().toISOString().slice(0, 10);
+
+  const fromSelect = document.getElementById('select-account-from');
+  const toSelect = document.getElementById('select-account-to');
+  if (fromSelect) {
+    fromSelect.innerHTML = state.accounts.map(function(a) {
+      return '<option value="' + a.id + '"' + (a.id === state.selectedAccountId ? ' selected' : '') + '>' + a.icon + ' ' + a.name + '</option>';
+    }).join('');
+  }
+  if (toSelect) {
+    toSelect.innerHTML = state.accounts
+      .filter(function(a) { return a.id !== state.selectedAccountId; })
+      .map(function(a) { return '<option value="' + a.id + '">' + a.icon + ' ' + a.name + '</option>'; })
+      .join('');
+  }
+
+  const isTransfer = type === 'transfer';
+  const blockTo = document.getElementById('block-account-to');
+  const blockCat = document.getElementById('block-category');
+  const labelFrom = document.getElementById('label-account-from');
+  if (blockTo) blockTo.classList.toggle('hidden', !isTransfer);
+  if (blockCat) blockCat.classList.toggle('hidden', isTransfer);
+  if (labelFrom) labelFrom.textContent = isTransfer ? 'Со счёта' : 'Счёт';
+
+  if (!isTransfer) renderCategoriesGrid();
+
+  openModal('modal-transaction');
+  setTimeout(function() {
+    const el = document.getElementById('input-amount');
+    if (el) el.focus();
+  }, 250);
+}
+
+
+function renderCategoriesGrid() {
+  const grid = document.getElementById('categories-grid');
+  if (!grid) return;
+  const cats = state.categories[state.currentAction] || [];
+  if (!state.selectedCategoryId && cats.length) state.selectedCategoryId = cats[0].id;
+  grid.innerHTML = cats.map(cat => {
+    const selected = state.selectedCategoryId === cat.id;
+    return `
+      <button type="button" onclick="selectCategory('${cat.id}')"
+        class="flex flex-col items-center gap-1 p-2 rounded-xl border transition active:scale-95
+               ${selected ? 'border-primary-500 bg-primary-500/15' : 'input-surface border-[var(--card-border)]'}">
+        <span class="text-xl">${cat.emoji}</span>
+        <span class="text-[10px] text-center leading-tight truncate w-full ${selected ? 'text-primary-500 font-medium' : 'text-main'}">${cat.name}</span>
+      </button>
+    `;
+  }).join('');
+  renderSubcategoriesRow();
+}
+
+function renderSubcategoriesRow() {
+  const block = document.getElementById('block-subcategory');
+  const row = document.getElementById('subcategories-row');
+  if (!block || !row) return;
+  const cat = getCategory(state.selectedCategoryId);
+  const subs = (cat && cat.subcategories) ? cat.subcategories : [];
+  if (!subs.length) {
+    block.classList.add('hidden');
+    state.selectedSubcategoryId = null;
+    row.innerHTML = '';
+    return;
+  }
+  block.classList.remove('hidden');
+  if (!state.selectedSubcategoryId || !subs.some(s => s.id === state.selectedSubcategoryId)) {
+    state.selectedSubcategoryId = null; // optional sub
+  }
+  row.innerHTML = `
+    <button type="button" onclick="selectSubcategory(null)"
+      class="px-3 py-1.5 rounded-lg text-xs border ${!state.selectedSubcategoryId ? 'border-primary-500 bg-primary-500/15 text-primary-500' : 'input-surface text-main'}">Без подкатегории</button>
+    ${subs.map(s => `
+      <button type="button" onclick="selectSubcategory('${s.id}')"
+        class="px-3 py-1.5 rounded-lg text-xs border ${state.selectedSubcategoryId === s.id ? 'border-primary-500 bg-primary-500/15 text-primary-500' : 'input-surface text-main'}">${s.name}</button>
+    `).join('')}
+  `;
+}
+
+function selectCategory(id) {
+  state.selectedCategoryId = id;
+  state.selectedSubcategoryId = null;
+  renderCategoriesGrid();
+}
+
+function selectSubcategory(id) {
+  state.selectedSubcategoryId = id;
+  renderSubcategoriesRow();
+}
+
+
+function saveTransaction() {
+  if (state._savingTx) return;
+  state._savingTx = true;
+  try {
+  const amount = parseFloat(document.getElementById('input-amount').value);
+  const note = document.getElementById('input-note').value.trim();
+  const date = document.getElementById('input-date').value;
+  const accountId = document.getElementById('select-account-from').value;
+  const toAccountId = document.getElementById('select-account-to').value;
+
+  if (!amount || amount <= 0) { alert('Введите сумму больше 0'); state._savingTx = false; return; }
+  if (!date) { alert('Выберите дату'); state._savingTx = false; return; }
+
+  if (state.currentAction === 'transfer') {
+    if (accountId === toAccountId) { alert('Выберите разные счета'); state._savingTx = false; return; }
+    if (!toAccountId) { alert('Выберите счёт назначения'); state._savingTx = false; return; }
+  } else if (!state.selectedCategoryId) {
+    alert('Выберите категорию'); state._savingTx = false; return;
+  }
+
+  const tx = {
+    id: uuid(),
+    type: state.currentAction,
+    amount,
+    accountId,
+    note,
+    date,
+    createdAt: new Date().toISOString(),
+  };
+
+  if (state.currentAction === 'transfer') tx.toAccountId = toAccountId;
+  else {
+    tx.categoryId = state.selectedCategoryId;
+    if (state.selectedSubcategoryId) tx.subcategoryId = state.selectedSubcategoryId;
+  }
+
+  state.transactions.push(tx);
+  saveData();
+  // hard close transaction UI and unlock screen
+  const txModal = document.getElementById('modal-transaction');
+  if (txModal) {
+    txModal.classList.add('hidden');
+    txModal.style.pointerEvents = 'none';
+  }
+  const sheet = document.getElementById('sheet-account');
+  if (sheet) {
+    sheet.classList.add('hidden');
+    sheet.style.pointerEvents = 'none';
+  }
+  document.body.style.overflow = '';
+  document.body.style.pointerEvents = '';
+  try { renderAll(); } catch (e) { console.error('renderAll after tx', e); }
+  } finally {
+    setTimeout(() => { state._savingTx = false; }, 400);
+  }
+}
+
+function openAddAccount() {
+  document.getElementById('input-account-name').value = '';
+  document.getElementById('input-account-balance').value = '';
+  state.selectedIcon = '💵';
+  document.querySelectorAll('.acc-icon').forEach(btn => {
+    btn.classList.toggle('border-primary-500', btn.dataset.icon === '💵');
+    btn.classList.toggle('border-transparent', btn.dataset.icon !== '💵');
+  });
+  openModal('modal-account');
+}
+
+function saveAccount() {
+  const name = document.getElementById('input-account-name').value.trim();
+  const balance = parseFloat(document.getElementById('input-account-balance').value) || 0;
+  if (!name) { alert('Введите название счёта'); return; }
+  const newAccId = uuid();
+  state.accounts.push({
+    id: newAccId,
+    name,
+    icon: state.selectedIcon,
+    balance,
+    initialBalance: balance,
+  });
+  if (!state.accountsOrder) state.accountsOrder = [];
+  state.accountsOrder.push('a:' + newAccId);
+  saveData();
+  closeModal('modal-account');
+  renderAccounts();
+}
+
+function exportCSV() {
+  if (state.transactions.length === 0) { alert('Нет данных для экспорта'); return; }
+  const header = 'Дата;Тип;Счёт;На счёт;Категория;Сумма;Комментарий\n';
+  const rows = state.transactions
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map(t => {
+      const acc = getAccount(t.accountId);
+      const toAcc = t.toAccountId ? getAccount(t.toAccountId) : null;
+      const cat = t.categoryId ? getCategory(t.categoryId) : null;
+      const typeLabel = { income: 'Доход', expense: 'Расход', transfer: 'Перевод' }[t.type];
+      return `${t.date};${typeLabel};${acc?.name || ''};${toAcc?.name || ''};${cat?.name || ''};${t.amount};"${(t.note || '').replace(/"/g, '""')}"`;
+    }).join('\n');
+
+  const blob = new Blob(['\ufeff' + header + rows], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `fino_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportJSON() {
+  const backup = {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    accounts: state.accounts,
+    folders: state.folders,
+    accountsOrder: state.accountsOrder,
+    transactions: state.transactions,
+    categories: state.categories,
+    budgets: state.budgets,
+    blockOrder: state.blockOrder,
+      actionOrder: state.actionOrder,
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `fino_backup_${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  alert('Резервная копия сохранена.\nОтправьте этот файл на второй телефон и нажмите «Восстановить».');
+}
+
+function importJSON(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.accounts || !data.transactions) {
+        alert('Неверный формат файла резервной копии');
+        return;
+      }
+      if (!confirm('Заменить текущие данные данными из файла?\nТекущие данные будут перезаписаны.')) return;
+
+      state.accounts = data.accounts;
+      state.transactions = data.transactions;
+      if (data.categories) state.categories = data.categories;
+      saveData();
+      closeModal('modal-settings');
+      renderAll();
+      alert('Данные успешно восстановлены!');
+    } catch (err) {
+      console.error(err);
+      alert('Ошибка при чтении файла. Убедитесь, что это файл резервной копии Фино.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function clearAllData() {
+  if (!confirm('Удалить ВСЕ данные? Это нельзя отменить.')) return;
+  if (!confirm('Точно удалить все счета и операции?')) return;
+  state.accounts = JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS));
+  state.transactions = [];
+  state.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+  saveData();
+  closeModal('modal-settings');
+  renderAll();
+}
+
+// ==================== Theme & Wallpaper ====================
+
+function applyFontScale() {
+  const scaleMap = { sm: 0.95, md: 1.02, lg: 1.1, xl: 1.18 };
+  const scale = scaleMap[state.fontScale] || 1;
+  document.documentElement.style.fontSize = (16 * scale) + 'px';
+  document.documentElement.style.setProperty('--font-scale', String(scale));
+  ['sm','md','lg','xl'].forEach(k => {
+    const btn = document.getElementById('font-' + k);
+    if (!btn) return;
+    const on = state.fontScale === k;
+    const sizeCls = k === 'xl' ? 'text-sm' : (k === 'lg' ? 'text-xs' : 'text-[10px]');
+    btn.className = `font-size-btn px-2.5 py-1.5 rounded-md font-medium ${sizeCls} ${on ? 'bg-primary-600 text-white' : 'text-muted'}`;
+  });
+}
+
+function applyBudgetCols() {
+  const cols = state.budgetCols === 1 ? 1 : 2;
+  [1, 2].forEach(k => {
+    const btn = document.getElementById('budget-cols-' + k);
+    if (!btn) return;
+    const on = cols === k;
+    btn.className = `budget-cols-btn px-2.5 py-1.5 rounded-md text-xs font-medium ${on ? 'bg-primary-600 text-white' : 'text-muted'}`;
+  });
+}
+
+function setBudgetCols(n) {
+  state.budgetCols = n === 1 ? 1 : 2;
+  saveData();
+  applyBudgetCols();
+  renderHomeBudgets();
+}
+
+function setFontScale(scale) {
+  state.fontScale = scale;
+  saveData();
+  applyFontScale();
+}
+
+function applyTheme() {
+  const isDark = state.theme === 'dark';
+  document.documentElement.classList.toggle('dark', isDark);
+  document.body.classList.toggle('dark', isDark);
+
+  const darkBtn = document.getElementById('theme-dark');
+  const lightBtn = document.getElementById('theme-light');
+  if (darkBtn && lightBtn) {
+    darkBtn.className = `theme-btn px-3 py-1.5 rounded-md text-xs font-medium ${isDark ? 'bg-primary-600 text-white' : 'text-muted'}`;
+    lightBtn.className = `theme-btn px-3 py-1.5 rounded-md text-xs font-medium ${!isDark ? 'bg-primary-600 text-white' : 'text-muted'}`;
+  }
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isDark ? '#0f172a' : '#f1f5f9');
+}
+
+function applyWallpaper() {
+  const layer = document.getElementById('wallpaper-layer');
+  const img = document.getElementById('wallpaper-img');
+  if (!layer || !img) return;
+  if (state.wallpaper) {
+    layer.classList.remove('hidden');
+    document.body.classList.add('has-wallpaper');
+    img.style.backgroundImage = `url(${state.wallpaper})`;
+    img.style.filter = `blur(${state.wallpaperBlur}px)`;
+    img.style.transform = state.wallpaperBlur > 0 ? 'scale(1.1)' : 'scale(1)';
+  } else {
+    layer.classList.add('hidden');
+    document.body.classList.remove('has-wallpaper');
+    img.style.backgroundImage = '';
+  }
+  const range = document.getElementById('blur-range');
+  const val = document.getElementById('blur-value');
+  if (range) range.value = state.wallpaperBlur;
+  if (val) val.textContent = state.wallpaperBlur + ' px';
+}
+
+function setTheme(theme) {
+  state.theme = theme;
+  saveData();
+  applyTheme();
+}
+
+// ==================== Manage Accounts ====================
+
+function renderManageAccounts() {
+  const list = document.getElementById('manage-accounts-list');
+  if (!list) return;
+  list.innerHTML = state.accounts.map(a => `
+    <div class="flex items-center gap-3 input-surface rounded-2xl px-3 py-3">
+      <span class="text-xl">${a.icon}</span>
+      <div class="flex-1 min-w-0">
+        <p class="font-medium text-sm truncate text-main">${a.name}</p>
+        <p class="text-xs text-muted">${formatMoneyPlain(a.balance)}</p>
+      </div>
+      <button onclick="openEditAccount('${a.id}')" class="px-3 py-1.5 text-xs input-surface border rounded-lg text-main">Изменить</button>
+    </div>
+  `).join('');
+}
+
+function openEditAccount(id) {
+  const acc = getAccount(id);
+  if (!acc) return;
+  state.editingAccountId = id;
+  state.selectedIcon = acc.icon;
+  document.getElementById('edit-account-name').value = acc.name;
+  document.querySelectorAll('.edit-acc-icon').forEach(btn => {
+    btn.classList.toggle('border-primary-500', btn.dataset.icon === acc.icon);
+    btn.classList.toggle('border-transparent', btn.dataset.icon !== acc.icon);
+  });
+  openModal('modal-edit-account');
+}
+
+function saveEditAccount() {
+  try {
+    const nameEl = document.getElementById('edit-account-name');
+    const name = (nameEl?.value || '').trim();
+    if (!name) { alert('Введите название'); return; }
+    if (!state.editingAccountId) { alert('Счёт не выбран'); return; }
+    const acc = getAccount(state.editingAccountId);
+    if (!acc) { alert('Счёт не найден'); return; }
+    acc.name = name;
+    acc.icon = state.selectedIcon || acc.icon;
+    saveData();
+    closeModal('modal-edit-account');
+    renderAccounts();
+    if (typeof renderManageAccounts === 'function') renderManageAccounts();
+    openModal('modal-manage-accounts');
+  } catch (e) {
+    console.error(e);
+    alert('Ошибка сохранения счёта: ' + e.message);
+  }
+}
+
+function deleteAccount() {
+  if (!state.editingAccountId) return;
+  if (state.accounts.length <= 1) { alert('Должен остаться хотя бы один счёт'); return; }
+  if (!confirm('Удалить счёт? Операции по нему останутся.')) return;
+  state.accounts = state.accounts.filter(a => a.id !== state.editingAccountId);
+  saveData();
+  closeModal('modal-edit-account');
+  renderAccounts();
+  renderManageAccounts();
+}
+
+// ==================== Manage Categories ====================
+
+
+function renderManageCategories() {
+  const list = document.getElementById('manage-categories-list');
+  if (!list) return;
+  const cats = state.categories[state.catTab] || [];
+  if (!cats.length) {
+    list.innerHTML = '<p class="text-muted text-sm text-center py-4">Нет категорий</p>';
+    return;
+  }
+  list.innerHTML = cats.map(c => {
+    const subs = (c.subcategories || []).map(s => s.name).join(', ');
+    return `
+      <div class="input-surface rounded-2xl px-3 py-3 flex items-center gap-3">
+        <span class="text-xl">${c.emoji}</span>
+        <div class="flex-1 min-w-0">
+          <p class="font-medium text-sm text-main">${c.name}</p>
+          ${subs ? `<p class="text-[10px] text-muted truncate">${subs}</p>` : ''}
+        </div>
+        <button onclick="openEditCategory('${c.id}', '${state.catTab}')" class="px-3 py-1.5 text-xs input-surface border rounded-lg">Изменить</button>
+      </div>`;
+  }).join('');
+}
+
+function openAddCategory() {
+  state.editingCategoryId = null;
+  state.editingCategoryIcon = state.catTab === 'expense' ? '🏷️' : '💵';
+  state.editingCategorySubs = [];
+  document.getElementById('cat-edit-title').textContent = 'Новая категория';
+  document.getElementById('cat-edit-name').value = '';
+  document.getElementById('btn-delete-category-full').classList.add('hidden');
+  renderCatIconGrid();
+  renderCatSubsList();
+  openModal('modal-edit-category');
+}
+
+function openEditCategory(id, type) {
+  const cat = (state.categories[type] || []).find(c => c.id === id);
+  if (!cat) return;
+  state.catTab = type;
+  state.editingCategoryId = id;
+  state.editingCategoryIcon = cat.emoji || '📦';
+  state.editingCategorySubs = JSON.parse(JSON.stringify(cat.subcategories || []));
+  document.getElementById('cat-edit-title').textContent = 'Редактировать';
+  document.getElementById('cat-edit-name').value = cat.name;
+  document.getElementById('btn-delete-category-full').classList.remove('hidden');
+  renderCatIconGrid();
+  renderCatSubsList();
+  openModal('modal-edit-category');
+}
+
+function renderCatIconGrid() {
+  const grid = document.getElementById('cat-icon-grid');
+  if (!grid) return;
+  grid.innerHTML = CAT_ICONS.map(icon => {
+    const sel = state.editingCategoryIcon === icon;
+    return `<button type="button" onclick="selectCatIcon('${icon}')"
+      class="w-9 h-9 rounded-lg text-lg flex items-center justify-center ${sel ? 'bg-primary-600/30 ring-2 ring-primary-500' : 'input-surface'}">${icon}</button>`;
+  }).join('');
+}
+
+function selectCatIcon(icon) {
+  state.editingCategoryIcon = icon;
+  renderCatIconGrid();
+}
+
+function renderCatSubsList() {
+  const list = document.getElementById('cat-subs-list');
+  if (!list) return;
+  if (!state.editingCategorySubs.length) {
+    list.innerHTML = '<p class="text-xs text-muted">Подкатегорий нет</p>';
+    return;
+  }
+  list.innerHTML = state.editingCategorySubs.map((s, i) => `
+    <div class="flex items-center gap-2 input-surface rounded-xl px-3 py-2">
+      <span class="flex-1 text-sm text-main">${s.name}</span>
+      <button onclick="removeSub(${i})" class="text-muted text-xs px-2">✕</button>
+    </div>
+  `).join('');
+}
+
+function addSubcategory() {
+  const input = document.getElementById('cat-sub-name');
+  const name = (input?.value || '').trim();
+  if (!name) return;
+  state.editingCategorySubs.push({ id: 'sub_' + uuid(), name });
+  input.value = '';
+  renderCatSubsList();
+}
+
+function removeSub(index) {
+  state.editingCategorySubs.splice(index, 1);
+  renderCatSubsList();
+}
+
+function saveCategory() {
+  try {
+  const name = (document.getElementById('cat-edit-name')?.value || '').trim();
+  if (!name) { alert('Введите название'); return; }
+  const type = state.catTab || 'expense';
+  if (state.editingCategoryId) {
+    const cat = state.categories[type].find(c => c.id === state.editingCategoryId);
+    if (cat) {
+      cat.name = name;
+      cat.emoji = state.editingCategoryIcon;
+      cat.subcategories = state.editingCategorySubs;
+    }
+  } else {
+    state.categories[type].push({
+      id: 'custom_' + uuid(),
+      name,
+      emoji: state.editingCategoryIcon,
+      color: '#64748b',
+      subcategories: state.editingCategorySubs,
+    });
+  }
+  saveData();
+  closeModal('modal-edit-category');
+  renderManageCategories();
+  openModal('modal-manage-categories');
+  if (typeof renderCategoriesGrid === 'function') renderCategoriesGrid();
+  } catch (e) {
+    console.error(e);
+    alert('Ошибка сохранения категории: ' + e.message);
+  }
+}
+
+function deleteCategoryFull() {
+  if (!state.editingCategoryId) return;
+  if (!confirm('Удалить категорию и её подкатегории?')) return;
+  const type = state.catTab;
+  state.categories[type] = state.categories[type].filter(c => c.id !== state.editingCategoryId);
+  // also remove budgets for this category
+  state.budgets = (state.budgets || []).filter(b => b.categoryId !== state.editingCategoryId);
+  saveData();
+  closeModal('modal-edit-category');
+  renderManageCategories();
+  renderHomeBudgets();
+}
+
+function deleteCategory(id, type) {
+  if (!confirm('Удалить категорию?')) return;
+  state.categories[type] = state.categories[type].filter(c => c.id !== id);
+  state.budgets = (state.budgets || []).filter(b => b.categoryId !== id);
+  saveData();
+  renderManageCategories();
+  renderHomeBudgets();
+}
+
+
+
+// ==================== Share ====================
+
+async function shareToTelegram() {
+  const backup = {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    accounts: state.accounts,
+    folders: state.folders,
+    accountsOrder: state.accountsOrder,
+    transactions: state.transactions,
+    categories: state.categories,
+    budgets: state.budgets,
+    blockOrder: state.blockOrder,
+      actionOrder: state.actionOrder,
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const file = new File([blob], `fino_backup_${new Date().toISOString().slice(0, 10)}.json`, { type: 'application/json' });
+
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: 'Фино — резервная копия',
+        text: 'Резервная копия приложения Фино',
+      });
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
+  }
+  // fallback
+  exportJSON();
+}
+
+// ==================== Render all ====================
+
+
+// ==================== Budgets ====================
+
+function getBudgetSpent(categoryId) {
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  return state.transactions
+    .filter(t => t.type === 'expense' && t.categoryId === categoryId && t.date.startsWith(monthKey))
+    .reduce((s, t) => s + t.amount, 0);
+}
+
+function budgetProgressColor(pct) {
+  if (pct >= 90) return '#f43f5e';
+  if (pct >= 70) return '#f97316';
+  return '#22c55e';
+}
+
+function renderHomeBudgets() {
+  const list = document.getElementById('home-budgets-list');
+  const empty = document.getElementById('home-budgets-empty');
+  if (!list) return;
+  const shown = state.budgets.filter(b => b.showOnHome).slice(0, 20);
+  if (shown.length === 0) {
+    list.innerHTML = '';
+    if (empty) empty.classList.remove('hidden');
+    return;
+  }
+  if (empty) empty.classList.add('hidden');
+  const cols = state.budgetCols === 1 ? 1 : 2;
+  list.className = cols === 1 ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-2 gap-2';
+  list.innerHTML = shown.map(b => {
+    const cat = getCategory(b.categoryId) || { name: '?', emoji: '📦' };
+    const spent = getBudgetSpent(b.categoryId);
+    const pct = b.limit > 0 ? Math.min(100, Math.round(spent / b.limit * 100)) : 0;
+    const color = budgetProgressColor(pct);
+    return `
+      <div class="card-surface border rounded-xl px-2.5 py-2 active:scale-[0.98] transition min-w-0 overflow-hidden" onclick="openEditBudget('${b.id}')">
+        <div class="flex items-center gap-1 mb-1 min-w-0">
+          <span class="text-base shrink-0 leading-none">${cat.emoji}</span>
+          <span class="font-medium text-xs text-main fit-line flex-1">${cat.name}</span>
+          <span class="text-[10px] font-semibold shrink-0 tabular-nums" style="color:${color}">${pct}%</span>
+        </div>
+        <div class="progress-bar mb-1" style="height:4px"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div>
+        <p class="text-[10px] text-muted fit-line">${formatMoneyPlain(spent)} / ${formatMoneyPlain(b.limit)}</p>
+      </div>`;
+  }).join('');
+}
+
+function renderManageBudgets() {
+  const list = document.getElementById('manage-budgets-list');
+  if (!list) return;
+  if (state.budgets.length === 0) {
+    list.innerHTML = '<p class="text-muted text-sm text-center py-4">Нет бюджетов</p>';
+    return;
+  }
+  list.innerHTML = state.budgets.map(b => {
+    const cat = getCategory(b.categoryId) || { name: '?', emoji: '📦' };
+    const spent = getBudgetSpent(b.categoryId);
+    const pct = b.limit > 0 ? Math.min(100, Math.round(spent / b.limit * 100)) : 0;
+    const color = budgetProgressColor(pct);
+    return `
+      <div class="input-surface rounded-2xl px-3 py-3 flex items-center gap-3">
+        <span class="text-xl">${cat.emoji}</span>
+        <div class="flex-1 min-w-0">
+          <p class="font-medium text-sm text-main">${cat.name}</p>
+          <p class="text-xs text-muted">${formatMoneyPlain(spent)} / ${formatMoneyPlain(b.limit)} · ${pct}%</p>
+          <p class="text-[10px] text-muted mt-0.5">${b.showOnHome ? '✓ на главной' : 'скрыт'}</p>
+        </div>
+        <button onclick="openEditBudget('${b.id}')" class="px-3 py-1.5 text-xs input-surface border rounded-lg">Изменить</button>
+      </div>`;
+  }).join('');
+}
+
+function openCreateBudget() {
+  state.editingBudgetId = null;
+  document.getElementById('budget-modal-title').textContent = 'Новый бюджет';
+  document.getElementById('budget-limit').value = '';
+  document.getElementById('budget-show-home').checked = true;
+  document.getElementById('btn-delete-budget').classList.add('hidden');
+  const sel = document.getElementById('budget-category');
+  sel.innerHTML = (state.categories.expense || []).map(c =>
+    `<option value="${c.id}">${c.emoji} ${c.name}</option>`
+  ).join('');
+  openModal('modal-budget');
+}
+
+function openEditBudget(id) {
+  const b = state.budgets.find(x => x.id === id);
+  if (!b) return;
+  state.editingBudgetId = id;
+  document.getElementById('budget-modal-title').textContent = 'Редактировать бюджет';
+  document.getElementById('budget-limit').value = b.limit;
+  document.getElementById('budget-show-home').checked = !!b.showOnHome;
+  document.getElementById('btn-delete-budget').classList.remove('hidden');
+  const sel = document.getElementById('budget-category');
+  sel.innerHTML = (state.categories.expense || []).map(c =>
+    `<option value="${c.id}" ${c.id === b.categoryId ? 'selected' : ''}>${c.emoji} ${c.name}</option>`
+  ).join('');
+  closeModal('modal-manage-budgets');
+  openModal('modal-budget');
+}
+
+function saveBudget() {
+  const categoryId = document.getElementById('budget-category').value;
+  const limit = parseFloat(document.getElementById('budget-limit').value);
+  const showOnHome = document.getElementById('budget-show-home').checked;
+  if (!categoryId || !limit || limit <= 0) { alert('Укажите категорию и лимит'); return; }
+  // one budget per category
+  const existing = state.budgets.find(b => b.categoryId === categoryId && b.id !== state.editingBudgetId);
+  if (existing) { alert('Бюджет для этой категории уже есть'); return; }
+
+  if (state.editingBudgetId) {
+    const b = state.budgets.find(x => x.id === state.editingBudgetId);
+    if (b) { b.categoryId = categoryId; b.limit = limit; b.showOnHome = showOnHome; }
+  } else {
+    state.budgets.push({ id: uuid(), categoryId, limit, showOnHome });
+  }
+  saveData();
+  closeModal('modal-budget');
+  renderHomeBudgets();
+  renderManageBudgets();
+  openModal('modal-manage-budgets');
+}
+
+function deleteBudget() {
+  if (!state.editingBudgetId) return;
+  if (!confirm('Удалить бюджет?')) return;
+  state.budgets = state.budgets.filter(b => b.id !== state.editingBudgetId);
+  saveData();
+  closeModal('modal-budget');
+  renderHomeBudgets();
+  renderManageBudgets();
+}
+
+
+function getPeriodRange(period) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  if (period === 'month') {
+    const mm = String(m+1).padStart(2,'0');
+    return { start: `${y}-${mm}-01`, end: `${y}-${mm}-31` };
+  }
+  if (period === 'prev_month') {
+    const d = new Date(y, m - 1, 1);
+    const yy = d.getFullYear();
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    return { start: `${yy}-${mm}-01`, end: `${yy}-${mm}-31` };
+  }
+  if (period === 'year') {
+    return { start: `${y}-01-01`, end: `${y}-12-31` };
+  }
+  if (period === 'prev_year') {
+    return { start: `${y-1}-01-01`, end: `${y-1}-12-31` };
+  }
+  return { start: '2000-01-01', end: '2100-12-31' };
+}
+
+function openAnalytics(period) {
+  state.analyticsPeriod = period || state.analyticsPeriod || 'month';
+  renderAnalytics();
+  const screen = document.getElementById('screen-analytics');
+  if (screen) {
+    screen.classList.remove('hidden');
+    screen.style.pointerEvents = 'auto';
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeAnalytics() {
+  const screen = document.getElementById('screen-analytics');
+  if (screen) {
+    screen.classList.add('hidden');
+    screen.style.pointerEvents = 'none';
+  }
+  document.body.style.overflow = '';
+}
+
+function renderAnalytics() {
+  const period = state.analyticsPeriod || 'month';
+  let start, end;
+  try {
+    ({ start, end } = getPeriodRange(period));
+  } catch (e) {
+    console.error(e);
+    start = '2000-01-01'; end = '2100-12-31';
+  }
+  const txs = (state.transactions || []).filter(t => t.date && t.date >= start && t.date <= end);
+  let income = 0, expense = 0;
+  const byCat = {};
+  txs.forEach(t => {
+    if (t.type === 'income') income += t.amount;
+    else if (t.type === 'expense') {
+      expense += t.amount;
+      byCat[t.categoryId] = (byCat[t.categoryId] || 0) + t.amount;
+    }
+  });
+  const incEl = document.getElementById('an-income');
+  const expEl = document.getElementById('an-expense');
+  const diffEl = document.getElementById('an-diff');
+  if (incEl) incEl.textContent = formatMoneyPlain(income);
+  if (expEl) expEl.textContent = formatMoneyPlain(expense);
+  if (diffEl) {
+    diffEl.textContent = formatMoney(income - expense);
+    diffEl.className = `font-bold ${income - expense >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+  }
+  const list = document.getElementById('analytics-by-category');
+  if (!list) return;
+  const entries = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
+  if (!entries.length) {
+    list.innerHTML = '<p class="text-muted text-sm">Нет расходов за период</p>';
+    return;
+  }
+  const max = entries[0][1] || 1;
+  list.innerHTML = entries.map(([id, amount]) => {
+    const cat = getCategory(id) || { name: 'Другое', emoji: '📦' };
+    const pct = Math.round(amount / max * 100);
+    return `<div>
+      <div class="flex justify-between text-sm mb-1"><span>${cat.emoji} ${cat.name}</span><span class="font-medium">${formatMoneyPlain(amount)}</span></div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:#38bdf8"></div></div>
+    </div>`;
+  }).join('');
+
+  // period button styles
+  document.querySelectorAll('.an-period').forEach(btn => {
+    const active = btn.dataset.period === period;
+    btn.className = `an-period px-3 py-1.5 rounded-lg text-xs font-medium ${active ? 'bg-primary-600 text-white' : 'input-surface text-muted'}`;
+  });
+}
+
+
+const BLOCK_LABELS = {
+  budgets: 'Бюджеты',
+  accounts: 'Мои счета',
+  operations: 'Последние операции',
+};
+
+
+function renderAccountsOrderList() {
+  const list = document.getElementById('accounts-order-list');
+  if (!list) return;
+  const order = ensureAccountsOrder();
+  const folders = state.folders || [];
+  const folderMap = Object.fromEntries(folders.map(f => [f.id, f]));
+  list.innerHTML = order.map((key, i) => {
+    let label = key;
+    if (key.startsWith('f:')) {
+      const f = folderMap[key.slice(2)];
+      label = `${f?.icon || '📁'} ${f?.name || 'Папка'} (папка)`;
+    } else if (key.startsWith('a:')) {
+      const a = getAccount(key.slice(2));
+      label = `${a?.icon || '💳'} ${a?.name || 'Счёт'}`;
+    }
+    return `
+      <div class="flex items-center gap-2 input-surface rounded-xl px-3 py-2">
+        <span class="flex-1 text-sm text-main truncate">${label}</span>
+        <button type="button" data-move-acc="${i}" data-move-dir="-1" class="w-8 h-8 rounded-lg input-surface border text-sm ${i===0?'opacity-30 pointer-events-none':''}">↑</button>
+        <button type="button" data-move-acc="${i}" data-move-dir="1" class="w-8 h-8 rounded-lg input-surface border text-sm ${i===order.length-1?'opacity-30 pointer-events-none':''}">↓</button>
+      </div>`;
+  }).join('') || '<p class="text-xs text-muted">Нет счетов</p>';
+}
+
+function moveAccountItem(index, dir) {
+  try {
+    const order = ensureAccountsOrder();
+    const newIndex = index + dir;
+    if (newIndex < 0 || newIndex >= order.length) return;
+    const tmp = order[index];
+    order[index] = order[newIndex];
+    order[newIndex] = tmp;
+    state.accountsOrder = order;
+    saveData();
+    renderAccountsOrderList();
+    renderAccounts();
+  } catch (e) {
+    console.error(e);
+    alert('Ошибка: ' + e.message);
+  }
+}
+
+
+function applyBlockOrder() {
+  try {
+    const main = document.querySelector('#screen-home main');
+    if (!main) return;
+    const blocks = {
+      budgets: document.getElementById('block-budgets'),
+      accounts: document.getElementById('block-accounts'),
+      operations: document.getElementById('block-operations'),
+    };
+    const order = state.blockOrder || ['budgets', 'accounts', 'operations'];
+    order.forEach(key => {
+      if (blocks[key] && blocks[key].parentElement === main) {
+        main.appendChild(blocks[key]);
+      } else if (blocks[key]) {
+        main.appendChild(blocks[key]);
+      }
+    });
+  } catch (e) {
+    console.warn('applyBlockOrder', e);
+  }
+}
+
+function renderBlockOrderList() {
+  const list = document.getElementById('block-order-list');
+  if (!list) return;
+  const order = state.blockOrder || ['budgets', 'accounts', 'operations'];
+  list.innerHTML = order.map((key, i) => `
+    <div class="flex items-center gap-2 input-surface rounded-xl px-3 py-2.5">
+      <span class="flex-1 text-sm font-medium text-main">${BLOCK_LABELS[key] || key}</span>
+      <button type="button" data-move-block="${i}" data-move-dir="-1" class="w-8 h-8 rounded-lg input-surface border text-sm ${i===0?'opacity-30 pointer-events-none':''}">↑</button>
+      <button type="button" data-move-block="${i}" data-move-dir="1" class="w-8 h-8 rounded-lg input-surface border text-sm ${i===order.length-1?'opacity-30 pointer-events-none':''}">↓</button>
+    </div>
+  `).join('');
+}
+
+function moveBlock(index, dir) {
+  try {
+    const order = [...(state.blockOrder || ['budgets', 'accounts', 'operations'])];
+    const newIndex = index + dir;
+    if (newIndex < 0 || newIndex >= order.length) return;
+    const tmp = order[index];
+    order[index] = order[newIndex];
+    order[newIndex] = tmp;
+    state.blockOrder = order;
+    saveData();
+    renderBlockOrderList();
+    applyBlockOrder();
+  } catch (e) {
+    console.error(e);
+    alert('Ошибка порядка блоков: ' + e.message);
+  }
+}
+
+
+function renderAll() {
+  renderSummaries();
+  renderHomeBudgets();
+  renderAccounts();
+  renderRecent();
+  applyBlockOrder();
+  if (!document.getElementById('screen-transactions').classList.contains('hidden')) {
+    renderAllTransactions();
+  }
+}
+
+// ==================== Init ====================
+
+
+function openSettings() {
+  try {
+    try { renderBlockOrderList(); } catch (e) { console.warn('block order', e); }
+    try { renderAccountsOrderList(); } catch (e) { console.warn('acc order', e); }
+    try { applyBudgetCols(); } catch (e) {}
+    try { renderActionOrderList(); } catch (e) {}
+    openModal('modal-settings');
+  } catch (e) {
+    console.error(e);
+    alert('Ошибка открытия настроек: ' + e.message);
+  }
+}
+window.openSettings = openSettings;
+
+function handleSettingsClick(e) {
+  const btn = e.target.closest('button');
+  if (!btn || !btn.id) return;
+  const id = btn.id;
+  try {
+    if (id === 'theme-dark') { setTheme('dark'); return; }
+    if (id === 'theme-light') { setTheme('light'); return; }
+    if (id === 'font-sm') { setFontScale('sm'); return; }
+    if (id === 'font-md') { setFontScale('md'); return; }
+    if (id === 'font-lg') { setFontScale('lg'); return; }
+    if (id === 'font-xl') { setFontScale('xl'); return; }
+    if (id === 'budget-cols-1') { setBudgetCols(1); return; }
+    if (id === 'budget-cols-2') { setBudgetCols(2); return; }
+    if (id === 'btn-wallpaper') { closeModal('modal-settings'); openModal('modal-wallpaper'); return; }
+    if (id === 'btn-manage-accounts') { closeModal('modal-settings'); renderManageAccounts(); openModal('modal-manage-accounts'); return; }
+    if (id === 'btn-manage-folders') { openManageFolders(); return; }
+    if (id === 'btn-manage-categories') {
+      closeModal('modal-settings');
+      state.catTab = 'expense';
+      renderManageCategories();
+      openModal('modal-manage-categories');
+      return;
+    }
+    if (id === 'btn-manage-budgets') { closeModal('modal-settings'); renderManageBudgets(); openModal('modal-manage-budgets'); return; }
+    if (id === 'btn-export-json') { exportJSON(); return; }
+    if (id === 'btn-share-telegram') { shareToTelegram(); return; }
+    if (id === 'btn-import-json') { document.getElementById('import-file-input')?.click(); return; }
+    if (id === 'btn-export') { exportCSV(); return; }
+    if (id === 'btn-clear-data') { clearAllData(); return; }
+  } catch (err) {
+    console.error('settings action', id, err);
+    alert('Ошибка: ' + (err.message || err));
+  }
+}
+
+window.handleSettingsClick = handleSettingsClick;
+
+
+
+document.addEventListener('click', function(e) {
+  // data-close (backdrop or X or cancel)
+  const closeEl = e.target.closest('[data-close]');
+  if (closeEl && closeEl.getAttribute('data-close')) {
+    // only if click is directly on close control or backdrop, not a nested interactive that also has other actions
+    if (!e.target.closest('[data-start-action], [data-move-action], [data-move-acc], [data-move-block], [data-delete-tx]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const target = closeEl.getAttribute('data-close');
+      if (target === 'modal-settings' || target === 'sheet-account') {
+        closeAllModals(); // full unlock — these are root sheets
+      } else {
+        closeModal(target);
+      }
+      return;
+    }
+  }
+
+  const btn = e.target.closest('button');
+  if (!btn) return;
+
+  const startAct = btn.getAttribute('data-start-action');
+  if (startAct) {
+    e.preventDefault();
+    e.stopPropagation();
+    startAction(startAct);
+    return;
+  }
+  const moveAct = btn.getAttribute('data-move-action');
+  if (moveAct !== null) {
+    e.preventDefault();
+    e.stopPropagation();
+    moveActionItem(parseInt(moveAct, 10), parseInt(btn.getAttribute('data-move-dir') || '0', 10));
+    return;
+  }
+  const delTx = btn.getAttribute('data-delete-tx');
+  if (delTx !== null) {
+    e.preventDefault();
+    e.stopPropagation();
+    deleteTransaction(delTx);
+    return;
+  }
+  const moveAcc = btn.getAttribute('data-move-acc');
+  if (moveAcc !== null) {
+    e.preventDefault();
+    e.stopPropagation();
+    moveAccountItem(parseInt(moveAcc, 10), parseInt(btn.getAttribute('data-move-dir') || '0', 10));
+    return;
+  }
+  const moveIdx = btn.getAttribute('data-move-block');
+  if (moveIdx !== null) {
+    e.preventDefault();
+    e.stopPropagation();
+    moveBlock(parseInt(moveIdx, 10), parseInt(btn.getAttribute('data-move-dir') || '0', 10));
+    return;
+  }
+
+  // Icon pickers
+  if (btn.classList.contains('edit-acc-icon') || btn.classList.contains('acc-icon')) {
+    state.selectedIcon = btn.dataset.icon || state.selectedIcon;
+    document.querySelectorAll('.edit-acc-icon, .acc-icon').forEach(b => {
+      const on = b.dataset.icon === state.selectedIcon;
+      b.classList.toggle('border-primary-500', on);
+      b.classList.toggle('border-transparent', !on);
+    });
+    return;
+  }
+
+  const id = btn.id;
+  if (!id) return;
+  try {
+    if (id === 'btn-save-edit-account') { e.preventDefault(); saveEditAccount(); }
+    else if (id === 'btn-delete-account') { e.preventDefault(); deleteAccount(); }
+    else if (id === 'btn-save-category') { e.preventDefault(); saveCategory(); }
+    else if (id === 'btn-delete-category-full') { e.preventDefault(); deleteCategoryFull(); }
+    else if (id === 'btn-save-budget') { e.preventDefault(); saveBudget(); }
+    else if (id === 'btn-delete-budget') { e.preventDefault(); deleteBudget(); }
+    else if (id === 'btn-save-folder') { e.preventDefault(); saveFolder(); }
+    else if (id === 'btn-create-folder') { e.preventDefault(); closeModal('modal-manage-folders'); openCreateFolder(); }
+    else if (id === 'btn-open-add-category') { e.preventDefault(); openAddCategory(); }
+    else if (id === 'btn-add-sub') { e.preventDefault(); addSubcategory(); }
+    else if (id === 'btn-create-budget') { e.preventDefault(); closeModal('modal-manage-budgets'); openCreateBudget(); }
+    else if (id === 'btn-save-account') { e.preventDefault(); saveAccount(); }
+    else if (id === 'btn-save-tx') { e.preventDefault(); saveTransaction(); }
+  } catch (err) {
+    console.error('click', id, err);
+    alert('Ошибка: ' + (err.message || err));
+  }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadData();
+  try { renderAll(); } catch (e) { console.error('renderAll', e); }
+  // sheet actions built on open
+
+  // Ensure all modals start non-interactive when hidden
+  document.querySelectorAll('[id^="modal-"], [id^="sheet-"]').forEach(m => {
+    if (m.classList.contains('hidden')) m.style.pointerEvents = 'none';
+  });
+
+
+  // data-close handled by document click delegation
+
+  document.getElementById('btn-settings')?.addEventListener('click', openSettings);
+  document.getElementById('modal-settings')?.addEventListener('click', handleSettingsClick);
+
+  // removed duplicate: document.getElementById('btn-create-fold
+  // removed duplicate: document.getElementById('btn-save-folder
+
+
+  document.getElementById('btn-import-json')?.addEventListener('click', () => {
+    document.getElementById('import-file-input')?.click();
+  });
+  document.getElementById('import-file-input')?.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) importJSON(file);
+    e.target.value = '';
+  });
+
+
+  document.getElementById('btn-wallpaper')?.addEventListener('click', () => {
+    closeModal('modal-settings');
+    openModal('modal-wallpaper');
+  });
+  document.getElementById('btn-pick-wallpaper')?.addEventListener('click', () => document.getElementById('wallpaper-input')?.click());
+  document.getElementById('wallpaper-input')?.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      state.wallpaper = ev.target.result;
+      saveData();
+      applyWallpaper();
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('blur-range')?.addEventListener('input', (e) => {
+    state.wallpaperBlur = parseInt(e.target.value, 10);
+    const val = document.getElementById('blur-value');
+    if (val) val.textContent = state.wallpaperBlur + ' px';
+    applyWallpaper();
+  });
+  document.getElementById('blur-range')?.addEventListener('change', () => saveData());
+  document.getElementById('btn-remove-wallpaper')?.addEventListener('click', () => {
+    state.wallpaper = null;
+    state.wallpaperBlur = 0;
+    saveData();
+    applyWallpaper();
+    closeModal('modal-wallpaper');
+  });
+
+  document.getElementById('btn-manage-accounts')?.addEventListener('click', () => {
+    closeModal('modal-settings');
+    renderManageAccounts();
+    openModal('modal-manage-accounts');
+  });
+  document.getElementById('btn-add-account-from-manage')?.addEventListener('click', () => {
+    closeModal('modal-manage-accounts');
+    openAddAccount();
+  });
+  // removed duplicate: document.getElementById('btn-save-edit-a
+  // removed duplicate: document.getElementById('btn-delete-acco
+  document.querySelectorAll('.edit-acc-icon').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.selectedIcon = btn.dataset.icon;
+      document.querySelectorAll('.edit-acc-icon').forEach(b => {
+        b.classList.toggle('border-primary-500', b.dataset.icon === state.selectedIcon);
+        b.classList.toggle('border-transparent', b.dataset.icon !== state.selectedIcon);
+      });
+    });
+  });
+
+  document.getElementById('btn-manage-categories')?.addEventListener('click', () => {
+    closeModal('modal-settings');
+    state.catTab = 'expense';
+    const te = document.getElementById('cat-tab-expense');
+    const ti = document.getElementById('cat-tab-income');
+    if (te) te.className = 'cat-tab flex-1 py-2 rounded-lg text-sm font-medium bg-rose-600 text-white';
+    if (ti) ti.className = 'cat-tab flex-1 py-2 rounded-lg text-sm font-medium input-surface text-main';
+    renderManageCategories();
+    openModal('modal-manage-categories');
+  });
+  document.getElementById('cat-tab-expense')?.addEventListener('click', () => {
+    state.catTab = 'expense';
+    document.getElementById('cat-tab-expense').className = 'cat-tab flex-1 py-2 rounded-lg text-sm font-medium bg-rose-600 text-white';
+    document.getElementById('cat-tab-income').className = 'cat-tab flex-1 py-2 rounded-lg text-sm font-medium input-surface text-main';
+    renderManageCategories();
+  });
+  document.getElementById('cat-tab-income')?.addEventListener('click', () => {
+    state.catTab = 'income';
+    document.getElementById('cat-tab-income').className = 'cat-tab flex-1 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white';
+    document.getElementById('cat-tab-expense').className = 'cat-tab flex-1 py-2 rounded-lg text-sm font-medium input-surface text-main';
+    renderManageCategories();
+  });
+
+  // removed duplicate: document.getElementById('btn-open-add-ca
+  // removed duplicate: document.getElementById('btn-save-catego
+  // removed duplicate: document.getElementById('btn-delete-cate
+  // removed duplicate: document.getElementById('btn-add-sub')?.
+  document.getElementById('cat-sub-name')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') addSubcategory(); });
+
+  document.querySelectorAll('.an-period').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.analyticsPeriod = btn.dataset.period;
+      renderAnalytics();
+    });
+  });
+
+  // removed duplicate: document.getElementById('btn-save-tx')?.
+  document.getElementById('btn-add-account')?.addEventListener('click', openAddAccount);
+  // removed duplicate: document.getElementById('btn-save-accoun
+
+  document.querySelectorAll('.acc-icon').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.selectedIcon = btn.dataset.icon;
+      document.querySelectorAll('.acc-icon').forEach(b => {
+        b.classList.toggle('border-primary-500', b.dataset.icon === state.selectedIcon);
+        b.classList.toggle('border-transparent', b.dataset.icon !== state.selectedIcon);
+      });
+    });
+  });
+
+  document.getElementById('btn-all-transactions')?.addEventListener('click', () => {
+    state.txFilter = 'all';
+    document.querySelectorAll('.tx-filter').forEach(b => {
+      b.className = 'tx-filter px-3 py-1.5 rounded-lg text-xs font-medium input-surface text-muted';
+    });
+    const allBtn = document.querySelector('[data-filter="all"]');
+    if (allBtn) allBtn.className = 'tx-filter px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-600 text-white';
+    renderAllTransactions();
+    showScreen('transactions');
+  });
+  document.getElementById('btn-back-home')?.addEventListener('click', () => showScreen('home'));
+
+  document.querySelectorAll('.tx-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.txFilter = btn.dataset.filter;
+      document.querySelectorAll('.tx-filter').forEach(b => {
+        b.className = 'tx-filter px-3 py-1.5 rounded-lg text-xs font-medium input-surface text-muted';
+      });
+      btn.className = 'tx-filter px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-600 text-white';
+      renderAllTransactions();
+    });
+  });
+
+  document.getElementById('btn-manage-budgets')?.addEventListener('click', () => {
+    closeModal('modal-settings');
+    renderManageBudgets();
+    openModal('modal-manage-budgets');
+  });
+  // removed duplicate: document.getElementById('btn-create-budg
+  document.getElementById('btn-all-budgets')?.addEventListener('click', () => {
+    renderManageBudgets();
+    openModal('modal-manage-budgets');
+  });
+  // removed duplicate: document.getElementById('btn-save-budget
+  // removed duplicate: document.getElementById('btn-delete-budg
+
+  document.getElementById('card-month')?.addEventListener('click', () => openAnalytics('month'));
+  document.getElementById('card-year')?.addEventListener('click', () => openAnalytics('year'));
+  document.getElementById('btn-back-from-analytics')?.addEventListener('click', closeAnalytics);
+});
+
+window.openAccountSheet = openAccountSheet;
+window.selectCategory = selectCategory;
+window.openEditAccount = openEditAccount;
+window.deleteCategory = deleteCategory;
+window.openEditBudget = openEditBudget;
+window.moveBlock = moveBlock;
+window.openEditCategory = openEditCategory;
+window.selectCatIcon = selectCatIcon;
+window.removeSub = removeSub;
+window.openAddCategory = openAddCategory;
+window.openSettings = openSettings;
+
+
+window.toggleFolder = toggleFolder;
+window.openEditFolder = openEditFolder;
+window.deleteFolder = deleteFolder;
+window.openManageFolders = openManageFolders;
+window.moveAccountItem = moveAccountItem;
+
+window.closeAllModals = closeAllModals;
+
+window.selectSubcategory = selectSubcategory;
+
+window.deleteTransaction = deleteTransaction;
+
+</script>
+</body>
+</html>
